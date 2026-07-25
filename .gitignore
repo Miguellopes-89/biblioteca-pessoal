@@ -1,0 +1,21 @@
+# .gitignore
+#
+# Ficheiros e pastas que não devem ir para o repositório Git.
+
+# Cache de bytecode do Python — gerado automaticamente, não é código-fonte.
+__pycache__/
+*.pyc
+
+# A base de dados fica de fora de propósito: contém os teus dados
+# pessoais (a tua coleção de livros), e cada pessoa que clonar o
+# repositório deve começar com uma base de dados vazia própria, criada
+# automaticamente na primeira vez que corre o programa.
+data/
+
+# Ficheiros de ambiente virtual Python, caso venhamos a usar um.
+.venv/
+venv/
+
+# Ficheiros específicos de sistema operativo.
+.DS_Store
+Thumbs.db
