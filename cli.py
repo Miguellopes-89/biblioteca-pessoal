@@ -11,6 +11,7 @@
 # de tocar em database.py.
 
 import database
+import metadados_isbn
 from constantes import ESTADOS_LEITURA, GENEROS, LIMITE_NOTA
 
 
@@ -71,12 +72,47 @@ def mostrar_lista(livros):
     print(f"\nTotal: {len(livros)} livro(s)")
 
 
+def pedir_titulo_e_autor_com_isbn(isbn):
+    """
+    Se houver ISBN, tenta ir buscar título e autor automaticamente à
+    Open Library. Se conseguir, mostra o que encontrou e deixa o
+    utilizador aceitar (Enter) ou corrigir (escrever outro valor) —
+    nunca grava dados da API sem o utilizador ver e poder ajustar.
+    Se não houver ISBN, ou a pesquisa falhar, pede os dados à moda
+    antiga (à mão). Devolve sempre (titulo, autor).
+    """
+    if not isbn:
+        titulo = input("Título: ").strip()
+        autor = input("Autor: ").strip()
+        return titulo, autor
+
+    print("A procurar dados pelo ISBN...")
+    encontrado = metadados_isbn.procurar_por_isbn(isbn)
+
+    if not encontrado:
+        print("Não encontrei dados automáticos para este ISBN — preenche à mão.")
+        titulo = input("Título: ").strip()
+        autor = input("Autor: ").strip()
+        return titulo, autor
+
+    autor_encontrado = encontrado["autor"] or "(autor desconhecido)"
+    print(f'Encontrado: "{encontrado["titulo"]}" — {autor_encontrado}')
+
+    titulo_input = input(f'Título [{encontrado["titulo"]}]: ').strip()
+    titulo = titulo_input or encontrado["titulo"]
+
+    autor_por_omissao = encontrado["autor"] or ""
+    autor_input = input(f"Autor [{autor_por_omissao}]: ").strip()
+    autor = autor_input or autor_por_omissao
+
+    return titulo, autor
+
+
 def accao_adicionar_livro():
     """Recolhe os dados de um livro novo e guarda-o na base de dados."""
     print("\n--- Adicionar novo livro ---")
-    titulo = input("Título: ").strip()
-    autor = input("Autor: ").strip()
-    isbn = input("ISBN (opcional): ").strip() or None
+    isbn = input("ISBN (opcional — Enter para saltar): ").strip() or None
+    titulo, autor = pedir_titulo_e_autor_com_isbn(isbn)
     genero = escolher_de_lista(GENEROS, "Género:")
     estado = escolher_de_lista(ESTADOS_LEITURA, "Estado de leitura:")
     nota = pedir_nota()
