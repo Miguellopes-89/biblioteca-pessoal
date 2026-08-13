@@ -19,4 +19,4 @@ jobs:
 
       - name: Verificar se a aplicação inicia
         # O "6" serve para escolher a opção "Sair" e o teste corre sem ficar preso
-        run: echo '6' | python cli.py
+        run: echo '0' | python cli.py
