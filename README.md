@@ -1,3 +1,5 @@
+[![Testes Automáticos](https://github.com/Miguellopes-89/biblioteca-pessoal/actions/workflows/ci.yml/badge.svg)](https://github.com/Miguellopes-89/biblioteca-pessoal/actions/workflows/ci.yml)
+
 # Biblioteca Pessoal
 
 Aplicação local para registo e inventário da minha coleção pessoal de
