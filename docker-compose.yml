@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  biblioteca:
+    build: .
+    volumes:
+      # Isto é genial: guarda a base de dados fora da caixa,
+      # para não perderes os teus livros quando a caixa desliga!
+      - ./data:/app/data
+    stdin_open: true   # Permite escreveres na CLI
+    tty: true          # Mantém a consola bonita

@@ -1,0 +1,22 @@
+name: Testes Automáticos
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Buscar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Verificar se a aplicação inicia
+        # O "6" serve para escolher a opção "Sair" e o teste corre sem ficar preso
+        run: echo '6' | python cli.py
