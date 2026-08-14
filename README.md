@@ -34,8 +34,11 @@ Duas interfaces disponíveis, com a mesma lógica de dados por baixo:
   (`data/biblioteca.db`), sem necessidade de servidor
 - **Tkinter/ttk** — interface gráfica, incluída na biblioteca padrão
 - **requests** — chamadas à API da Open Library
+- **pytest** — suite de testes automatizados (35 testes, cobrindo
+  camada de dados e integração com a API de ISBN)
 - **Docker** — empacotamento para correr sem Python instalado no host
-- **GitHub Actions** — integração contínua (build + smoke test a cada push)
+- **GitHub Actions** — integração contínua (testes automáticos +
+  smoke test a cada push)
 
 ## Como correr
 
@@ -55,6 +58,20 @@ A base de dados é criada automaticamente na primeira execução.
 
 docker compose up
 
+
+## Testes
+
+O projeto tem uma suite de testes automatizados com `pytest`, cobrindo
+a camada de acesso a dados (`database.py`) e a integração com a API
+de ISBN (`metadados_isbn.py`), incluindo casos de erro (rede em baixo,
+timeout, dados inválidos) e as regras de integridade da base de dados.
+
+pip install -r requirements-dev.txt
+python -m pytest -v
+
+
+Corre automaticamente em cada `push` via GitHub Actions (ver badge
+no topo desta página).
 
 ## Estrutura do projeto
 
@@ -86,6 +103,8 @@ de commits reflete essa evolução:
 
 ## Nota
 
-Projeto pessoal, desenvolvido com apoio do Claude (Anthropic) como
-arquiteto/engenheiro, num processo colaborativo de decisão de produto
-e implementação técnica.
+Projeto pessoal, construído de forma incremental como exercício de
+arquitetura de software. As decisões de produto e as opções técnicas
+foram tomadas por mim, com o Claude (Anthropic) como parceiro de
+implementação — o histórico de commits e o `CONTEXT.md` documentam
+o raciocínio por trás de cada decisão.
