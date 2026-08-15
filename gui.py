@@ -9,9 +9,9 @@
 # ISBN continua em metadados_isbn.py — exatamente a mesma separação de
 # responsabilidades que já tínhamos entre cli.py e o resto do
 # programa. É por isso que esta interface gráfica não precisou de
-# tocar em nenhum desses dois ficheiros: só reutiliza o que já estava
-# testado e a funcionar através da CLI. cli.py continua a funcionar
-# normalmente — esta é só uma segunda forma de usar a mesma biblioteca.
+# tocar em database.py: só reutiliza o que já estava testado e a
+# funcionar através da CLI. cli.py continua a funcionar normalmente —
+# esta é só uma segunda forma de usar a mesma biblioteca.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -334,12 +334,20 @@ class JanelaAdicionarLivro(tk.Toplevel):
             messagebox.showinfo("ISBN em falta", "Escreve um ISBN antes de procurar.")
             return
 
-        encontrado = metadados_isbn.procurar_por_isbn(isbn)
-        if not encontrado:
+        try:
+            encontrado = metadados_isbn.procurar_por_isbn(isbn)
+        except metadados_isbn.ISBNNaoEncontrado:
             messagebox.showinfo(
                 "Não encontrado",
-                "Não foi possível encontrar dados automáticos para este ISBN.\n"
+                "Este ISBN não existe no catálogo da Open Library.\n"
                 "Preenche o título e o autor à mão.",
+            )
+            return
+        except metadados_isbn.ErroDeRede:
+            messagebox.showwarning(
+                "Sem ligação",
+                "Não foi possível contactar a Open Library agora.\n"
+                "Preenche o título e o autor à mão, ou tenta outra vez mais tarde.",
             )
             return
 
@@ -368,6 +376,20 @@ class JanelaAdicionarLivro(tk.Toplevel):
                 "Nota demasiado longa", f"A nota tem {len(nota)} caracteres — o limite é {LIMITE_NOTA}."
             )
             return
+
+        if isbn:
+            # Aviso, não bloqueio — mesma decisão de cli.py: o
+            # utilizador pode ter mesmo duas cópias físicas do mesmo
+            # livro, por isso pergunta-se em vez de recusar.
+            livro_existente = database.buscar_livro_por_isbn(isbn)
+            if livro_existente:
+                continuar = messagebox.askyesno(
+                    "Possível duplicado",
+                    f'Já existe um livro com este ISBN:\n"{livro_existente["titulo"]}" — '
+                    f'{livro_existente["autor"]}.\n\nAdicionar mesmo assim?',
+                )
+                if not continuar:
+                    return
 
         database.adicionar_livro(
             titulo=titulo, autor=autor, genero=genero, estado_leitura=estado, isbn=isbn, nota=nota

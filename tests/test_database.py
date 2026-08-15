@@ -81,6 +81,74 @@ def test_nota_no_limite_exato_e_aceite(bd_temporaria):
     assert database.listar_livros()[0]["nota"] == nota_no_limite
 
 
+# --- ISBN: normalização no armazenamento e deteção de duplicados ---
+#
+# Decisão de semântica do ISBN (ver CONTEXT.md): o ISBN é só metadado
+# (o identificador real é o id autoincrement), é normalizado antes de
+# gravar para que formatos diferentes do mesmo número não pareçam
+# livros distintos, e duplicados são permitidos ao nível da base de
+# dados — buscar_livro_por_isbn() serve para avisar a camada de
+# apresentação (cli.py / gui.py), não para bloquear a inserção.
+
+def test_adicionar_livro_normaliza_isbn_com_hifens(bd_temporaria):
+    database.adicionar_livro(
+        "Duna", "Frank Herbert", "Ficção Científica", "lido", isbn="978-989-23-1234-5"
+    )
+    assert database.listar_livros()[0]["isbn"] == "9789892312345"
+
+
+def test_adicionar_livro_sem_isbn_mantem_none(bd_temporaria):
+    """Livros sem ISBN não devem ser afetados pela normalização."""
+    database.adicionar_livro("Livro Sem ISBN", "Autor X", "Ensaio", "a ler")
+    assert database.listar_livros()[0]["isbn"] is None
+
+
+def test_buscar_livro_por_isbn_encontra_com_formato_ja_normalizado(bd_temporaria):
+    database.adicionar_livro("Duna", "Frank Herbert", "Ficção Científica", "lido", isbn="9789892312345")
+    encontrado = database.buscar_livro_por_isbn("9789892312345")
+    assert encontrado is not None
+    assert encontrado["titulo"] == "Duna"
+
+
+def test_buscar_livro_por_isbn_encontra_com_hifens(bd_temporaria):
+    """
+    Mesmo que o ISBN gravado tenha sido normalizado, a procura também
+    normaliza o que recebe — por isso "978-989-23-1234-5" encontra um
+    livro gravado como "9789892312345".
+    """
+    database.adicionar_livro("Duna", "Frank Herbert", "Ficção Científica", "lido", isbn="9789892312345")
+    encontrado = database.buscar_livro_por_isbn("978-989-23-1234-5")
+    assert encontrado is not None
+    assert encontrado["titulo"] == "Duna"
+
+
+def test_buscar_livro_por_isbn_inexistente_devolve_none(bd_temporaria):
+    assert database.buscar_livro_por_isbn("0000000000000") is None
+
+
+def test_buscar_livro_por_isbn_none_devolve_none(bd_temporaria):
+    assert database.buscar_livro_por_isbn(None) is None
+
+
+def test_buscar_livro_por_isbn_string_vazia_devolve_none(bd_temporaria):
+    assert database.buscar_livro_por_isbn("") is None
+
+
+def test_isbn_duplicado_e_permitido_na_insercao(bd_temporaria):
+    """
+    Decisão deliberada: sem UNIQUE na coluna isbn. Duplicados são
+    avisados na camada de apresentação (cli.py / gui.py via
+    buscar_livro_por_isbn), não bloqueados pela base de dados — o
+    utilizador pode ter mesmo duas cópias físicas do mesmo livro.
+    """
+    id1 = database.adicionar_livro("Duna", "Frank Herbert", "Ficção Científica", "lido", isbn="9789892312345")
+    id2 = database.adicionar_livro(
+        "Duna (2ª cópia)", "Frank Herbert", "Ficção Científica", "a ler", isbn="9789892312345"
+    )
+    assert id1 != id2
+    assert len(database.listar_livros()) == 2
+
+
 # --- listar_livros -----------------------------------------------------
 
 def test_listar_livros_sem_filtro_devolve_todos_ordenados_por_titulo(bd_temporaria):

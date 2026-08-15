@@ -78,8 +78,9 @@ def pedir_titulo_e_autor_com_isbn(isbn):
     Open Library. Se conseguir, mostra o que encontrou e deixa o
     utilizador aceitar (Enter) ou corrigir (escrever outro valor) —
     nunca grava dados da API sem o utilizador ver e poder ajustar.
-    Se não houver ISBN, ou a pesquisa falhar, pede os dados à moda
-    antiga (à mão). Devolve sempre (titulo, autor).
+    Se não houver ISBN, ou a pesquisa falhar (não encontrado ou erro
+    de rede), pede os dados à moda antiga (à mão). Devolve sempre
+    (titulo, autor).
     """
     if not isbn:
         titulo = input("Título: ").strip()
@@ -87,10 +88,15 @@ def pedir_titulo_e_autor_com_isbn(isbn):
         return titulo, autor
 
     print("A procurar dados pelo ISBN...")
-    encontrado = metadados_isbn.procurar_por_isbn(isbn)
+    encontrado = None
+    try:
+        encontrado = metadados_isbn.procurar_por_isbn(isbn)
+    except metadados_isbn.ISBNNaoEncontrado:
+        print("Não encontrei este ISBN na Open Library — preenche à mão.")
+    except metadados_isbn.ErroDeRede:
+        print("Não foi possível contactar a Open Library agora — preenche à mão.")
 
     if not encontrado:
-        print("Não encontrei dados automáticos para este ISBN — preenche à mão.")
         titulo = input("Título: ").strip()
         autor = input("Autor: ").strip()
         return titulo, autor
@@ -112,6 +118,23 @@ def accao_adicionar_livro():
     """Recolhe os dados de um livro novo e guarda-o na base de dados."""
     print("\n--- Adicionar novo livro ---")
     isbn = input("ISBN (opcional — Enter para saltar): ").strip() or None
+
+    if isbn:
+        # Aviso, não bloqueio: o ADR-001 já rejeitou "formatos
+        # duplicados" como cenário real desta biblioteca, mas o
+        # utilizador pode genuinamente ter duas cópias físicas do
+        # mesmo livro — não é a app que decide isso por ele.
+        livro_existente = database.buscar_livro_por_isbn(isbn)
+        if livro_existente:
+            print(
+                f'\nAviso: já existe um livro com este ISBN — '
+                f'"{livro_existente["titulo"]}" ({livro_existente["autor"]}).'
+            )
+            continuar = input("Adicionar mesmo assim? (s/n): ").strip().lower()
+            if continuar != "s":
+                print("Operação cancelada.")
+                return
+
     titulo, autor = pedir_titulo_e_autor_com_isbn(isbn)
     genero = escolher_de_lista(GENEROS, "Género:")
     estado = escolher_de_lista(ESTADOS_LEITURA, "Estado de leitura:")

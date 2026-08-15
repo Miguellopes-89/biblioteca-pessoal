@@ -12,6 +12,7 @@ import unicodedata
 from pathlib import Path
 
 from constantes import ESTADOS_LEITURA, LIMITE_NOTA
+from metadados_isbn import normalizar_isbn
 
 # Caminho para o ficheiro da base de dados. Path(__file__).parent dá-nos
 # a pasta onde este ficheiro está, e juntamos "data/biblioteca.db" a
@@ -96,9 +97,20 @@ def adicionar_livro(titulo, autor, genero, estado_leitura, isbn=None, nota=None)
     resto é obrigatório. Devolve o id do livro recém-criado, que é
     útil se quisermos, por exemplo, confirmar ao utilizador ou usá-lo
     logo a seguir noutra operação.
+
+    O ISBN é normalizado (hífens e espaços removidos, via
+    normalizar_isbn() de metadados_isbn.py) antes de ser guardado.
+    Sem isto, "978-989-23-1234-5" e "9789892312345" ficariam gravados
+    como valores diferentes, mesmo sendo o mesmo número — o que
+    tornaria a deteção de duplicados em buscar_livro_por_isbn() pouco
+    fiável. Reutilizamos a mesma função que já usávamos só para
+    pesquisa, para não ter duas normalizações de ISBN divergentes no
+    projeto.
     """
     if estado_leitura not in ESTADOS_LEITURA:
         raise ValueError(f"Estado de leitura inválido: {estado_leitura}")
+
+    isbn_normalizado = normalizar_isbn(isbn) if isbn else None
 
     ligacao = obter_ligacao()
     cursor = ligacao.execute(
@@ -106,12 +118,42 @@ def adicionar_livro(titulo, autor, genero, estado_leitura, isbn=None, nota=None)
         INSERT INTO livros (titulo, autor, isbn, genero, estado_leitura, nota)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (titulo, autor, isbn, genero, estado_leitura, nota),
+        (titulo, autor, isbn_normalizado, genero, estado_leitura, nota),
     )
     ligacao.commit()
     novo_id = cursor.lastrowid
     ligacao.close()
     return novo_id
+
+
+def buscar_livro_por_isbn(isbn):
+    """
+    Devolve o livro já existente com este ISBN, ou None se não houver
+    nenhum. isbn é normalizado antes da procura, pelo mesmo motivo de
+    adicionar_livro() — para que "978-989-23-1234-5" encontre um
+    livro gravado como "9789892312345".
+
+    Usada para avisar o utilizador de um possível duplicado antes de
+    gravar um livro novo. Propositadamente não impede a inserção (não
+    há UNIQUE na coluna isbn): o ADR-001 já rejeitou "formatos
+    duplicados" como cenário real desta biblioteca, mas nada impede
+    que o utilizador tenha mesmo duas cópias físicas do mesmo livro —
+    um bloqueio rígido tiraria essa possibilidade. Quem decide é o
+    utilizador, avisado; a base de dados não decide por ele.
+    """
+    if not isbn:
+        return None
+
+    isbn_normalizado = normalizar_isbn(isbn)
+    if not isbn_normalizado:
+        return None
+
+    ligacao = obter_ligacao()
+    linha = ligacao.execute(
+        "SELECT * FROM livros WHERE isbn = ?", (isbn_normalizado,)
+    ).fetchone()
+    ligacao.close()
+    return linha
 
 
 def listar_livros(estado_leitura=None):
