@@ -47,6 +47,53 @@ def create_tables():
     conn.close()
 
 
+def get_or_create_author(cursor, nome):
+    """Devolve o id do autor. Se não existir (comparação insensível a maiúsculas), cria-o."""
+    cursor.execute(
+        "SELECT id FROM autores WHERE LOWER(nome) = LOWER(?)", (nome,)
+    )
+    resultado = cursor.fetchone()
+
+    if resultado:
+        return resultado[0]  # autor já existia
+
+    cursor.execute("INSERT INTO autores (nome) VALUES (?)", (nome,))
+    return cursor.lastrowid  # id do autor recém-criado
+
+
+def add_book(titulo, editora, colecao, genero, isbn, autores_str):
+    """
+    Insere um livro e associa-o aos seus autores.
+    autores_str: nomes separados por vírgula, ex. "Fabcaro, Conrad"
+    """
+    autores = [nome.strip() for nome in autores_str.split(",") if nome.strip()]
+
+    conn = connect()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO livros (titulo, editora, colecao, genero, isbn)
+            VALUES (?, ?, ?, ?, ?)
+        """, (titulo, editora, colecao, genero, isbn))
+    except sqlite3.IntegrityError:
+        print(f"Este livro já existe na biblioteca (ISBN '{isbn}' duplicado).")
+        conn.close()
+        return None
+
+    livro_id = cursor.lastrowid
+
+    for nome_autor in autores:
+        autor_id = get_or_create_author(cursor, nome_autor)
+        cursor.execute("""
+            INSERT INTO livro_autor (livro_id, autor_id) VALUES (?, ?)
+        """, (livro_id, autor_id))
+
+    conn.commit()
+    conn.close()
+    return livro_id
+
+
 if __name__ == "__main__":
     create_tables()
     print("Base de dados e tabelas criadas com sucesso.")
