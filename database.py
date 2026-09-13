@@ -45,7 +45,8 @@ def create_tables():
             editora TEXT,
             colecao TEXT,
             genero TEXT,
-            isbn TEXT UNIQUE
+            isbn TEXT UNIQUE,
+            estado_leitura TEXT NOT NULL DEFAULT 'não lido'
         )
     """)
 
@@ -66,6 +67,15 @@ def create_tables():
         )
     """)
 
+    # Migração: se a base de dados já existia antes desta coluna ser introduzida,
+    # o CREATE TABLE IF NOT EXISTS acima não a adiciona (só corre em tabelas novas).
+    cursor.execute("PRAGMA table_info(livros)")
+    colunas_existentes = [linha[1] for linha in cursor.fetchall()]
+    if "estado_leitura" not in colunas_existentes:
+        cursor.execute(
+            "ALTER TABLE livros ADD COLUMN estado_leitura TEXT NOT NULL DEFAULT 'não lido'"
+        )
+
     conn.commit()
     conn.close()
 
@@ -84,7 +94,7 @@ def get_or_create_author(cursor, nome):
     return cursor.lastrowid  # id do autor recém-criado
 
 
-def add_book(titulo, editora, colecao, genero, isbn, autores_str):
+def add_book(titulo, editora, colecao, genero, isbn, autores_str, estado_leitura="não lido"):
     """
     Insere um livro e associa-o aos seus autores.
     autores_str: nomes separados por vírgula, ex. "Fabcaro, Conrad"
@@ -96,9 +106,9 @@ def add_book(titulo, editora, colecao, genero, isbn, autores_str):
 
     try:
         cursor.execute("""
-            INSERT INTO livros (titulo, editora, colecao, genero, isbn)
-            VALUES (?, ?, ?, ?, ?)
-        """, (titulo, editora, colecao, genero, isbn))
+            INSERT INTO livros (titulo, editora, colecao, genero, isbn, estado_leitura)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (titulo, editora, colecao, genero, isbn, estado_leitura))
     except sqlite3.IntegrityError:
         print(f"Este livro já existe na biblioteca (ISBN '{isbn}' duplicado).")
         conn.close()
@@ -133,6 +143,7 @@ def list_books():
             livros.colecao,
             livros.genero,
             livros.isbn,
+            livros.estado_leitura,
             GROUP_CONCAT(autores.nome, ', ') AS autores
         FROM livros
         LEFT JOIN livro_autor ON livros.id = livro_autor.livro_id
@@ -174,6 +185,7 @@ def search_books(termo):
             livros.colecao,
             livros.genero,
             livros.isbn,
+            livros.estado_leitura,
             GROUP_CONCAT(autores.nome, ', ') AS autores
         FROM livros
         LEFT JOIN livro_autor ON livros.id = livro_autor.livro_id
@@ -197,7 +209,7 @@ def search_books(termo):
     return [dict(linha) for linha in resultados]
 
 
-def update_book(livro_id, titulo=None, editora=None, colecao=None, genero=None, isbn=None, autores_str=None):
+def update_book(livro_id, titulo=None, editora=None, colecao=None, genero=None, isbn=None, autores_str=None, estado_leitura=None):
     """
     Atualiza os campos fornecidos de um livro existente, identificado por livro_id.
     Campos não fornecidos (None) mantêm o valor atual — permite atualizações parciais,
@@ -224,13 +236,14 @@ def update_book(livro_id, titulo=None, editora=None, colecao=None, genero=None, 
     novo_colecao = colecao if colecao is not None else livro_atual["colecao"]
     novo_genero = genero if genero is not None else livro_atual["genero"]
     novo_isbn = isbn if isbn is not None else livro_atual["isbn"]
+    novo_estado_leitura = estado_leitura if estado_leitura is not None else livro_atual["estado_leitura"]
 
     try:
         cursor.execute("""
             UPDATE livros
-            SET titulo = ?, editora = ?, colecao = ?, genero = ?, isbn = ?
+            SET titulo = ?, editora = ?, colecao = ?, genero = ?, isbn = ?, estado_leitura = ?
             WHERE id = ?
-        """, (novo_titulo, novo_editora, novo_colecao, novo_genero, novo_isbn, livro_id))
+        """, (novo_titulo, novo_editora, novo_colecao, novo_genero, novo_isbn, novo_estado_leitura, livro_id))
     except sqlite3.IntegrityError:
         print(f"Não foi possível atualizar: o ISBN '{novo_isbn}' já pertence a outro livro.")
         conn.close()
