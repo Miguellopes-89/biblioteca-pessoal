@@ -197,6 +197,80 @@ def search_books(termo):
     return [dict(linha) for linha in resultados]
 
 
+def update_book(livro_id, titulo=None, editora=None, colecao=None, genero=None, isbn=None, autores_str=None):
+    """
+    Atualiza os campos fornecidos de um livro existente, identificado por livro_id.
+    Campos não fornecidos (None) mantêm o valor atual — permite atualizações parciais,
+    ex. update_book(1, isbn="novo-isbn") só muda o ISBN.
+
+    Se autores_str for fornecido, substitui COMPLETAMENTE a lista de autores associados
+    (mesmo formato do add_book: nomes separados por vírgula).
+
+    Devolve True se o livro foi encontrado e atualizado, False caso contrário.
+    """
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM livros WHERE id = ?", (livro_id,))
+    livro_atual = cursor.fetchone()
+
+    if livro_atual is None:
+        print(f"Livro com id {livro_id} não encontrado.")
+        conn.close()
+        return False
+
+    novo_titulo = titulo if titulo is not None else livro_atual["titulo"]
+    novo_editora = editora if editora is not None else livro_atual["editora"]
+    novo_colecao = colecao if colecao is not None else livro_atual["colecao"]
+    novo_genero = genero if genero is not None else livro_atual["genero"]
+    novo_isbn = isbn if isbn is not None else livro_atual["isbn"]
+
+    try:
+        cursor.execute("""
+            UPDATE livros
+            SET titulo = ?, editora = ?, colecao = ?, genero = ?, isbn = ?
+            WHERE id = ?
+        """, (novo_titulo, novo_editora, novo_colecao, novo_genero, novo_isbn, livro_id))
+    except sqlite3.IntegrityError:
+        print(f"Não foi possível atualizar: o ISBN '{novo_isbn}' já pertence a outro livro.")
+        conn.close()
+        return False
+
+    if autores_str is not None:
+        autores = [nome.strip() for nome in autores_str.split(",") if nome.strip()]
+        cursor.execute("DELETE FROM livro_autor WHERE livro_id = ?", (livro_id,))
+        for nome_autor in autores:
+            autor_id = get_or_create_author(cursor, nome_autor)
+            cursor.execute("""
+                INSERT INTO livro_autor (livro_id, autor_id) VALUES (?, ?)
+            """, (livro_id, autor_id))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def delete_book(livro_id):
+    """
+    Remove um livro e as suas associações a autores (linhas em livro_autor).
+    Os autores em si NÃO são removidos, mesmo que fiquem sem nenhum livro associado
+    (decisão deliberada: preserva o registo do autor para reutilização futura).
+
+    Devolve True se o livro existia e foi removido, False se o id não existia.
+    """
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM livro_autor WHERE livro_id = ?", (livro_id,))
+    cursor.execute("DELETE FROM livros WHERE id = ?", (livro_id,))
+    livro_existia = cursor.rowcount > 0
+
+    conn.commit()
+    conn.close()
+
+    return livro_existia
+
+
 if __name__ == "__main__":
     create_tables()
     print("Base de dados e tabelas criadas com sucesso.")
