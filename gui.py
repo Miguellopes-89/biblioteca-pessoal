@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 
 from database import add_book, create_tables, list_books, update_book, delete_book, search_books
-from isbn_lookup import lookup_isbn
+from isbn_lookup import lookup_isbn, validar_isbn
 
 
 class PesquisaISBNThread(QThread):
@@ -132,6 +132,13 @@ class JanelaPrincipal(QMainWindow):
         isbn = self.campo_isbn.text().strip()
         if not isbn:
             QMessageBox.warning(self, "ISBN em falta", "Escreve um ISBN no campo antes de procurar.")
+            return
+
+        if not validar_isbn(isbn):
+            QMessageBox.warning(
+                self, "ISBN inválido",
+                "Este ISBN não tem um dígito de controlo válido — confirma se não há nenhum algarismo trocado.",
+            )
             return
 
         # Evita lançar uma segunda pesquisa enquanto a primeira ainda está a correr

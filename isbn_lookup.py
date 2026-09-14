@@ -102,6 +102,40 @@ def _fetch_open_library(isbn: str) -> dict | None:
     }
 
 
+def validar_isbn(isbn: str) -> bool:
+    """Valida o dígito de controlo de um ISBN-10 ou ISBN-13.
+
+    Não confirma que o livro existe (isso é o lookup_isbn) — só confirma
+    que o número em si é matematicamente válido, antes de gastarmos uma
+    chamada de rede com ele.
+
+    ISBN-13: soma ponderada (pesos alternados 1 e 3) tem de ser múltiplo de 10.
+    ISBN-10: soma ponderada (pesos 10 a 1) tem de ser múltiplo de 11;
+    o dígito de controlo pode ser 'X', que vale 10.
+    """
+    isbn = isbn.strip().replace("-", "").replace(" ", "").upper()
+
+    if len(isbn) == 13:
+        if not isbn.isdigit():
+            return False
+        soma = sum((1 if posicao % 2 == 0 else 3) * int(digito) for posicao, digito in enumerate(isbn))
+        return soma % 10 == 0
+
+    if len(isbn) == 10:
+        soma = 0
+        for posicao, digito in enumerate(isbn):
+            if digito == "X" and posicao == 9:
+                valor = 10
+            elif digito.isdigit():
+                valor = int(digito)
+            else:
+                return False
+            soma += valor * (10 - posicao)
+        return soma % 11 == 0
+
+    return False
+
+
 def lookup_isbn(isbn: str) -> dict | None:
     """Procura os metadados de um livro pelo ISBN.
 
