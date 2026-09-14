@@ -1,4 +1,5 @@
 import sys
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFormLayout,
     QLineEdit, QPushButton, QMessageBox, QComboBox,
@@ -6,6 +7,26 @@ from PySide6.QtWidgets import (
 )
 
 from database import add_book, create_tables, list_books, update_book, delete_book, search_books
+from isbn_lookup import lookup_isbn
+
+
+class PesquisaISBNThread(QThread):
+    """Corre lookup_isbn() num thread à parte, para não bloquear a GUI
+    enquanto se espera pela resposta da rede (pode demorar vários
+    segundos, sobretudo com as repetições em isbn_lookup.py).
+
+    resultado_pronto emite o dict devolvido por lookup_isbn(), ou None
+    se não foi encontrado nada em nenhuma das APIs.
+    """
+    resultado_pronto = Signal(object)
+
+    def __init__(self, isbn):
+        super().__init__()
+        self.isbn = isbn
+
+    def run(self):
+        resultado = lookup_isbn(self.isbn)
+        self.resultado_pronto.emit(resultado)
 
 
 class JanelaPrincipal(QMainWindow):
@@ -16,6 +37,12 @@ class JanelaPrincipal(QMainWindow):
 
         # None = modo "adicionar novo livro"; um id = modo "a editar este livro"
         self.livro_selecionado_id = None
+
+        # Referência ao thread de pesquisa ISBN em curso (None = nenhum a correr).
+        # Tem de ficar guardada num atributo da instância, não numa variável local:
+        # se não houver nenhuma referência viva, o Python recolhe o objeto (garbage
+        # collection) a meio da execução do thread, e a app rebenta sem aviso.
+        self.thread_pesquisa_isbn = None
 
         widget_central = QWidget()
         self.setCentralWidget(widget_central)
@@ -29,6 +56,14 @@ class JanelaPrincipal(QMainWindow):
         self.campo_estado_leitura = QComboBox()
         self.campo_estado_leitura.addItems(["não lido", "a ler", "lido"])
         self.campo_autores.setPlaceholderText("separados por vírgula, ex.: Fabcaro, Conrad")
+
+        # --- Campo ISBN + botão de procura ---
+        self.botao_procurar_isbn = QPushButton("Procurar")
+        self.botao_procurar_isbn.clicked.connect(self.pesquisar_isbn)
+
+        isbn_layout = QHBoxLayout()
+        isbn_layout.addWidget(self.campo_isbn)
+        isbn_layout.addWidget(self.botao_procurar_isbn)
 
         self.botao_adicionar = QPushButton("Adicionar Livro")
         self.botao_adicionar.clicked.connect(self.guardar_livro)
@@ -47,7 +82,7 @@ class JanelaPrincipal(QMainWindow):
         form_layout.addRow("Editora:", self.campo_editora)
         form_layout.addRow("Coleção:", self.campo_colecao)
         form_layout.addRow("Género:", self.campo_genero)
-        form_layout.addRow("ISBN:", self.campo_isbn)
+        form_layout.addRow("ISBN:", isbn_layout)
         form_layout.addRow("Estado de leitura:", self.campo_estado_leitura)
         form_layout.addRow(botoes_layout)
 
@@ -84,6 +119,46 @@ class JanelaPrincipal(QMainWindow):
         widget_central.setLayout(layout_principal)
 
         self.atualizar_tabela()
+
+    def pesquisar_isbn(self):
+        isbn = self.campo_isbn.text().strip()
+        if not isbn:
+            QMessageBox.warning(self, "ISBN em falta", "Escreve um ISBN no campo antes de procurar.")
+            return
+
+        # Evita lançar uma segunda pesquisa enquanto a primeira ainda está a correr
+        if self.thread_pesquisa_isbn is not None and self.thread_pesquisa_isbn.isRunning():
+            return
+
+        self.botao_procurar_isbn.setEnabled(False)
+        self.botao_procurar_isbn.setText("A procurar...")
+
+        self.thread_pesquisa_isbn = PesquisaISBNThread(isbn)
+        self.thread_pesquisa_isbn.resultado_pronto.connect(self.ao_receber_resultado_isbn)
+        self.thread_pesquisa_isbn.start()
+
+    def ao_receber_resultado_isbn(self, resultado):
+        self.botao_procurar_isbn.setEnabled(True)
+        self.botao_procurar_isbn.setText("Procurar")
+
+        if resultado is None:
+            QMessageBox.information(
+                self, "Não encontrado",
+                "Não foi possível encontrar este ISBN (nem na Google Books, nem na Open Library). "
+                "Podes continuar a preencher o formulário manualmente.",
+            )
+            return
+
+        # Só preenche os campos que a API efetivamente devolveu com conteúdo;
+        # campos que a API não tem (ex.: coleção) ficam tal como estavam.
+        if resultado["titulo"]:
+            self.campo_titulo.setText(resultado["titulo"])
+        if resultado["autores_str"]:
+            self.campo_autores.setText(resultado["autores_str"])
+        if resultado["editora"]:
+            self.campo_editora.setText(resultado["editora"])
+        if resultado["genero"]:
+            self.campo_genero.setText(resultado["genero"])
 
     def linha_selecionada(self):
         # Usar selectedItems() em vez de currentRow(): clearSelection() dispara
