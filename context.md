@@ -4,7 +4,7 @@
 
 ## Sobre o projeto
 
-Aplicação desktop em Python para catalogar livros pessoais (título, autor(es), editora, coleção, género, ISBN, estado de leitura), com inserção manual e/ou por leitura de ISBN via API gratuita (Open Library ou Google Books) — ainda não implementado —, base de dados SQLite local, GUI desktop em PySide6, funcionamento offline. Publicável no GitHub como parte do portefólio. Fase web é possibilidade futura (Docker pode entrar aí).
+Aplicação desktop em Python para catalogar livros pessoais (título, autor(es), editora, coleção, género, ISBN, estado de leitura), com inserção manual e/ou por leitura de ISBN via APIs gratuitas (Google Books + Open Library, em cascata) — **implementado nesta sessão** —, base de dados SQLite local, GUI desktop em PySide6, funcionamento offline. **Publicado no GitHub** como parte do portefólio: https://github.com/Miguellopes-89/biblioteca-pessoal (repositório público). Fase web é possibilidade futura (Docker pode entrar aí).
 
 Claude atua como tutor sénior: explica o "porquê" de cada decisão, avança passo a passo, nunca assume conhecimento prévio, nunca assume factos sobre o ambiente sem confirmar.
 
@@ -13,6 +13,7 @@ Claude atua como tutor sénior: explica o "porquê" de cada decisão, avança pa
 - **SO:** Windows
 - **Python:** 3.14.6
 - **Git:** 2.55.0
+- **GitHub CLI (`gh`):** 2.96.0, autenticado como `Miguellopes-89` (scopes: gist, read:org, repo, workflow)
 - **Editor:** Zed
 - **Docker:** instalado, não relevante ainda (fase web futura)
 - **Caminho do projeto:** `C:\Users\User\Projetos\biblioteca-pessoal`
@@ -20,93 +21,90 @@ Claude atua como tutor sénior: explica o "porquê" de cada decisão, avança pa
   ```powershell
   .\venv\Scripts\Activate.ps1
   ```
-- **Dependência externa instalada:** `PySide6` 6.11.2 (primeira dependência fora da standard library — `venv` agora obrigatório para correr `gui.py`, não só recomendado).
+- **Dependências externas instaladas:** `PySide6` 6.11.2. `requests` 2.34.2 também está instalado no `venv`, mas **já não é usado** (ver secção "Incidentes" — foi substituído por `urllib.request` da standard library). Pode ser desinstalado (`pip uninstall requests`) sem afetar nada; não é urgente.
 - **`pyrightconfig.json`** criado na raiz do projeto (`{"venvPath": ".", "venv": "venv"}`) para o linter do Zed (`basedpyright`) apontar para o interpretador do `venv` em vez do Python global do Windows. Resolveu os falsos erros de importação do PySide6.
 
 ## Estado atual do repositório Git
 
 - Branch única: `main`
-- Sem remoto configurado (ainda não ligado ao GitHub)
-- **9 commits feitos até ao início desta sessão** (ver histórico anterior). **Nesta sessão ainda não foi feito nenhum commit** — há trabalho substancial por commitar (ver secção "Ficheiros existentes"). Sugestão: pelo menos dois commits separados — um para a coluna `estado_leitura` + correções de bugs no `database.py`, outro para a GUI PySide6 completa (`gui.py` + `pyrightconfig.json`).
+- **Remoto configurado:** `origin` → `https://github.com/Miguellopes-89/biblioteca-pessoal.git` (público)
+- Working tree limpa, tudo commitado e sincronizado com o GitHub no fim desta sessão
 - `.gitignore` cobre: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `*.db`
+- **12 commits no total.** Os 3 feitos nesta sessão:
+  - `Adiciona lookup de ISBN via Google Books/Open Library com QThread`
+  - `Redimensiona colunas da tabela automaticamente (ID encolhe, Titulo estica)`
+  - (commit implícito do `gh repo create --push`, que enviou o histórico completo para o GitHub)
 
 ## Ficheiros existentes
 
 - `.gitignore`
 - `main.py` — smoke test original, sem lógica da aplicação. Não usado pela GUI.
-- `pyrightconfig.json` — novo nesta sessão (ver acima).
-- `database.py` — módulo da base de dados SQLite. Mudanças nesta sessão:
-  - Nova coluna `estado_leitura` (TEXT, NOT NULL, DEFAULT 'não lido') na tabela `livros`, com valores esperados: `"não lido"`, `"a ler"`, `"lido"`.
-  - `create_tables()` — migração idempotente: verifica via `PRAGMA table_info(livros)` se a coluna já existe; se não, corre `ALTER TABLE ADD COLUMN`. Seguro correr em bases de dados já existentes sem perder dados.
-  - `add_book(...)` — novo parâmetro `estado_leitura="não lido"` (omissão sensata).
-  - `list_books()` e `search_books()` — `SELECT` atualizado para incluir `livros.estado_leitura`.
-  - `update_book(...)` — novo parâmetro `estado_leitura=None` (segue o padrão dos outros campos opcionais: `None` = não mexer).
-  - Continua a expor: `normalize_text`, `connect`, `create_tables`, `get_or_create_author`, `add_book`, `list_books`, `search_books`, `update_book`, `delete_book`.
-- `gui.py` — **novo nesta sessão**. Interface desktop em PySide6 (`QMainWindow`). Contém:
-  - Formulário (`QFormLayout`) com campos para todos os atributos do livro, incluindo `QComboBox` para estado de leitura.
-  - Dois botões: "Adicionar Livro" / "Guardar Alterações" (o mesmo botão, texto muda consoante o modo) e "Remover Livro".
-  - Campo de pesquisa com botões "Pesquisar" e "Limpar", ligado a `search_books`.
-  - Tabela (`QTableWidget`, só leitura) a listar todos os livros, com 8 colunas (ID, Título, Autores, Editora, Coleção, Género, ISBN, Estado).
-  - Clicar numa linha da tabela carrega os dados no formulário e entra em "modo edição" (`self.livro_selecionado_id` guarda o id; `None` = modo adicionar).
-  - `guardar_livro()` decide entre `add_book` (modo adicionar) e `update_book` (modo edição) consoante `self.livro_selecionado_id`.
-  - `remover_livro()` pede confirmação via `QMessageBox.question` antes de chamar `delete_book`.
-  - `preencher_tabela(livros)` — método auxiliar partilhado entre `atualizar_tabela()` (lista completa) e `executar_pesquisa()` (resultados filtrados), para não duplicar a lógica de preencher a `QTableWidget`.
-  - Depois de guardar/remover, a tabela volta sempre à lista completa (não mantém filtro de pesquisa ativo) — simplificação deliberada, documentada no código.
-- `biblioteca.db` — gerado localmente, não versionado. Contém atualmente 3 livros de teste ("A Quinta Dos Animais", "Meditações", "O Despertar do Império").
+- `pyrightconfig.json`
+- `database.py` — módulo da base de dados SQLite. Sem alterações nesta sessão. Expõe: `normalize_text`, `connect`, `create_tables`, `get_or_create_author`, `add_book`, `list_books`, `search_books`, `update_book`, `delete_book`.
+- `isbn_lookup.py` — **novo nesta sessão**. Módulo de consulta de metadados por ISBN, sem qualquer dependência do PySide6 (testável isoladamente no terminal). Contém:
+  - `_pedir_json(url)` — GET genérico com `urllib.request`, `User-Agent` próprio, e **retry automático** (`TENTATIVAS = 3`, 1s de pausa entre tentativas) para lidar com falhas de rede intermitentes detetadas nesta máquina (ver "Incidentes").
+  - `_fetch_google_books(isbn)` / `_fetch_open_library(isbn)` — uma função por fonte, cada uma devolve um dict normalizado (`titulo`, `autores_str`, `editora`, `genero`) ou `None`.
+  - `lookup_isbn(isbn)` — função pública, cascata: tenta Google Books primeiro, só tenta Open Library se a primeira não encontrar nada. **Não funde campos das duas fontes** (decisão deliberada — evita inconsistências).
+  - Nenhuma das duas APIs expõe de forma fiável um campo "coleção" (série) — esse campo continua sempre a preenchimento manual.
+- `gui.py` — Interface desktop em PySide6 (`QMainWindow`). Alterações nesta sessão:
+  - **`PesquisaISBNThread(QThread)`** — nova classe, corre `lookup_isbn()` em thread separada, emite `resultado_pronto` (Signal) com o dict (ou `None`) no fim. A instância fica guardada em `self.thread_pesquisa_isbn` (atributo da instância, não variável local) para não ser recolhida pelo garbage collector a meio da execução.
+  - Botão **"Procurar"** ao lado do campo ISBN → `pesquisar_isbn()` lança o thread (com proteção contra duplo-clique via `isRunning()`), desativa o botão e muda o texto para "A procurar..." enquanto espera.
+  - `ao_receber_resultado_isbn(resultado)` — slot ligado ao `resultado_pronto`; reativa o botão; se `None`, mostra aviso "Não encontrado"; caso contrário preenche Título/Autores/Editora/Género (só os campos que a API devolveu com conteúdo, não sobrescreve Coleção nem Estado de leitura).
+  - **Colunas da tabela agora redimensionam automaticamente**: coluna ID em `ResizeToContents` (fica sempre estreita), coluna Título em `Stretch` (ocupa o espaço sobrante), restantes em `ResizeToContents`. Resolve o corte da coluna "Estado" em janelas estreitas.
+- `biblioteca.db` — gerado localmente, não versionado. Contém atualmente 4 livros de teste (os 3 anteriores + "Clean Code", adicionado via lookup de ISBN nesta sessão).
 
 ## Modelo de dados (schema SQLite)
 
-- **livros**: `id` (PK), `titulo`, `editora`, `colecao`, `genero`, `isbn` (UNIQUE), `estado_leitura` (NOT NULL, DEFAULT 'não lido') — coluna nova nesta sessão
+- **livros**: `id` (PK), `titulo`, `editora`, `colecao`, `genero`, `isbn` (UNIQUE), `estado_leitura` (NOT NULL, DEFAULT 'não lido')
 - **autores**: `id` (PK), `nome` (UNIQUE)
 - **livro_autor**: `livro_id` + `autor_id` (PK composta, FKs) — permite um livro ter vários autores e um autor ter vários livros
 
 ## Testado e validado nesta sessão
 
-- Instalação do PySide6 no `venv`, confirmada versão 6.11.2.
-- Janela mínima (`QMainWindow`) a abrir corretamente.
-- Formulário completo visível e funcional.
-- Migração da coluna `estado_leitura` — corre sem apagar dados existentes.
-- `add_book` via GUI — testado com sucesso, ISBN duplicado, e título vazio (os três casos dão o aviso/sucesso esperado).
-- Tabela de listagem — pré-preenchida no arranque, atualiza-se sozinha após adicionar.
-- Edição via seleção na tabela — campos preenchem-se ao clicar numa linha, `update_book` chamado corretamente, tabela atualiza.
-- Remoção via seleção — pede confirmação, `delete_book` chamado corretamente.
-- **Bug encontrado e corrigido**: depois de guardar/remover, `limpar_campos()` chama `tabela_livros.clearSelection()`, que dispara `itemSelectionChanged` outra vez. `linha_selecionada()` usava `currentRow()` (que não é reposto por `clearSelection()`), reentrando em modo edição imediatamente. Corrigido verificando `self.tabela_livros.selectedItems()` no início de `linha_selecionada()` antes de usar `currentRow()`.
-- Pesquisa — testada com termo existente (filtra corretamente), "Limpar" (volta à lista completa), termo inexistente (tabela vazia sem erro), e edição a partir dos resultados da pesquisa (funciona, tabela volta à lista completa depois de guardar).
+- `isbn_lookup.py` testado isoladamente no terminal (sem GUI) com ISBN real (Clean Code, 9780132350884) — sucesso via Open Library depois do retry.
+- Lookup via GUI: botão "Procurar" com ISBN válido → campos preenchidos automaticamente, janela manteve-se responsiva durante a chamada de rede (thread a funcionar corretamente).
+- ISBN inexistente (`0000000000000`) → aviso "Não encontrado", sem crash.
+- Duplo-clique no botão "Procurar" → não lança pesquisas em paralelo.
+- Livro obtido por lookup guardado com sucesso via "Adicionar Livro" (campos Coleção/Género preenchidos manualmente a seguir, como esperado — a API não os fornece de forma fiável).
+- Redimensionamento da janela — colunas ajustam-se corretamente, "Estado" deixou de ficar cortada.
+- `gh repo create --push` — repositório criado, código enviado, `git status` confirma sincronização completa com o `origin`.
 
 ## Incidentes resolvidos nesta sessão (histórico, não repetir)
 
-1. **Falsos erros do linter (`basedpyright`) a apontar para o Python global do Windows em vez do `venv`** — resolvido com `pyrightconfig.json` (ver secção Ambiente). O Zed não tem um comando "Select Interpreter" como o VS Code; a configuração é feita por ficheiro de projeto.
-2. **`database.py` colado pelo Miguel com bugs estruturais na função `update_book`**: a leitura de `livro_atual` da base de dados tinha desaparecido do código, com variáveis a serem usadas antes de definidas, e duas instruções `UPDATE` duplicadas. Corrigido reescrevendo a função com a ordem correta (SELECT → calcular novos valores → UPDATE único).
-3. **`gui.py` colado pelo Miguel com bug de indentação**: o método `atualizar_tabela` tinha ficado fora da classe `JanelaPrincipal` (a seguir ao bloco `if __name__ == "__main__":`), e havia uma linha órfã `widget_central.setLayout(layout)` a referenciar uma variável (`layout`) que já não existia. Corrigido movendo o método para dentro da classe e removendo a linha órfã.
-4. **Aviso "24 erros / 110 avisos" no Zed** — investigado, confirmado ser apenas avisos de type hints em falta (`reportUnknownParameterType`, `reportMissingParameterType` do `basedpyright`), zero impacto funcional. Baixa prioridade, não corrigido.
+1. **Google Books API sem chave devolve HTTP 429 (quota excedida)** — quota global partilhada por todos os utilizadores anónimos do mundo, esgotada com frequência. Não é um bug nosso; por isso o fallback para Open Library é essencial, não apenas "bónus".
+2. **Biblioteca `requests` (via `urllib3`) com ligações recusadas/resetadas pela Open Library nesta máquina**, mesmo com `User-Agent` customizado — `ConnectionResetError` (WinError 10054). `urllib.request` (standard library) e `Invoke-WebRequest` do PowerShell não tinham o mesmo problema. Diagnóstico: `Get-MpComputerStatus` confirmou o **Network Inspection System (NIS)** do Windows Defender ativo — o componente de inspeção profunda de pacotes, conhecido por interferir ocasionalmente com TLS de processos "não-browser". Solução aplicada: `isbn_lookup.py` usa só `urllib.request` (remove também uma dependência externa do projeto) **e** implementa retry automático (`TENTATIVAS = 3`), porque mesmo com `urllib` a falha continuou a acontecer de forma intermitente (não é 100% resolvida pela troca de biblioteca — é mesmo o sistema a interferir às vezes). Não se tentou desativar proteções de segurança — o retry é a resposta correta a nível de aplicação, e seria a prática certa de qualquer forma (redes reais falham).
 
 ## Notas técnicas / decisões tomadas
 
-- Escolha de biblioteca de GUI: **PySide6** (não `tkinter`) — decisão consciente para portefólio: visual mais moderno, widgets mais ricos, mostra mais capacidade técnica, apesar da dependência externa. Licença LGPL (diferença face ao PyQt, que é GPL/comercial).
-- Modo adicionar vs. modo edição na GUI é controlado por um único atributo (`self.livro_selecionado_id`, `None` ou um `id`), não por duas telas/formulários separados — mantém a GUI simples com um único conjunto de campos reutilizado.
-- Botão "Adicionar Livro" / "Guardar Alterações" é o mesmo widget, só muda o texto — evita duplicar lógica de validação.
-- `QMessageBox.question` usado para confirmar remoção (ação irreversível); `QMessageBox.information`/`.warning` para feedback de sucesso/erro nas outras ações.
-- `NoEditTriggers` na tabela — edição feita exclusivamente via formulário, não célula-a-célula diretamente na tabela.
+- **Cascata de APIs, não fusão de campos:** Google Books primeiro (melhor qualidade média), Open Library só como reserva se a primeira não encontrar nada. Fundir campos das duas fontes foi considerado e rejeitado — complexidade desproporcional ao ganho, risco de dados inconsistentes.
+- **`urllib.request` em vez de `requests`:** decisão pragmática pós-diagnóstico (ver "Incidentes"), com o benefício adicional de zero dependências externas para este módulo.
+- **Retry com backoff simples (não exponencial):** 3 tentativas, 1s de pausa fixa entre elas. Suficiente para o nível de instabilidade observado; não se justificou complexidade adicional (backoff exponencial, jitter) para este caso de uso.
+- **`QThread` para a chamada de rede:** decisão consciente para não bloquear a GUI durante o lookup (pode demorar vários segundos, sobretudo com os retries). A referência ao thread é guardada num atributo da instância (`self.thread_pesquisa_isbn`) — nunca numa variável local, que seria recolhida pelo garbage collector a meio da execução e rebentaria a app.
+- **Preenchimento seletivo dos campos após lookup:** só os campos que a API devolveu com conteúdo são escritos no formulário; Coleção e Estado de leitura nunca são tocados pelo lookup (a API não os fornece).
+- Escolha de biblioteca de GUI: **PySide6** (não `tkinter`) — decisão consciente para portefólio.
 - Todas as decisões anteriores sobre o modelo de dados (ISBN como chave de duplicado, `LOWER()` para autores, autores em string separada por vírgulas, normalização de pesquisa via `unicodedata`, autores órfãos mantidos após remover livro) continuam válidas e inalteradas.
+- **Repositório GitHub público**, com descrição em inglês (maior alcance junto de recrutadores de tecnologia), mencionando deliberadamente que o projeto foi feito no contexto de mudança de carreira — enquadrado como sinal de iniciativa.
 
 ## Próximo passo
 
-CRUD completo (criar, listar, pesquisar, editar, remover) está agora implementado e testado tanto na camada de dados como na GUI. Três direções possíveis para a próxima sessão, por ordem de prioridade sugerida:
+As três prioridades da sessão anterior estão todas fechadas: lookup de ISBN, polimento visual, publicação no GitHub. Possíveis direções para a próxima sessão (por decidir com o Miguel, nenhuma é urgente):
 
-1. **Fazer os commits em falta** — há trabalho substancial desde o último commit (coluna `estado_leitura`, `gui.py` completo, `pyrightconfig.json`). Deve ser o primeiro passo da próxima sessão, antes de continuar a desenvolver.
-2. **Polimento visual da GUI** — redimensionar colunas automaticamente (a coluna "Estado" fica cortada em janelas mais estreitas), considerar esconder/encolher a coluna ID.
-3. **Lookup de ISBN via API** (Open Library ou Google Books) — próximo salto funcional grande: chamada de rede, tratamento de falhas/timeouts, preenchimento automático do formulário a partir da resposta da API.
-4. **Publicar no GitHub** — repositório local pronto, falta criar o repo remoto e fazer o primeiro `push`.
+1. **`README.md`** — o repositório está público mas ainda sem README. Para um projeto de portefólio, isto é provavelmente a próxima prioridade lógica: é a primeira coisa que um recrutador vê.
+2. **`requirements.txt`** — o projeto só tem uma dependência externa (`PySide6`); ainda assim, é boa prática ter isto explícito para quem clonar o repositório.
+3. **Limpeza do `venv`** — desinstalar `requests` (já não é usado).
+4. **Fase web (Docker)** — mencionada desde o início como possibilidade futura, ainda sem prazo definido.
+5. Outras melhorias funcionais à GUI (ex.: validação de ISBN com dígito de controlo antes de pesquisar, capa do livro via `cover` que a Open Library já devolve na resposta).
 
 ## Regras de trabalho (lembrete permanente)
 
-- Nunca assumir nada sobre o ambiente ou ficheiros — confirmar sempre com Miguel antes de agir, especialmente antes de apagar/sobrepor ficheiros. Nesta sessão, ficheiros no computador do Miguel foram lidos e escritos diretamente via ferramenta de filesystem do Windows (com leitura prévia antes de qualquer escrita, para confirmar que o conteúdo em disco correspondia ao esperado).
+- Nunca assumir nada sobre o ambiente ou ficheiros — confirmar sempre com Miguel antes de agir, especialmente antes de apagar/sobrepor ficheiros. Ficheiros no computador do Miguel são lidos e escritos diretamente via ferramentas de filesystem do Windows (com leitura prévia antes de qualquer escrita).
 - Avançar em passos pequenos, um conceito de cada vez, com explicação, código comentado, forma de testar, e um exercício ou pergunta de consolidação.
-- Comunicação em Português Europeu (PT-PT). Código e nomes de variáveis/funções em inglês.
+- Comunicação em Português Europeu (PT-PT). Código e nomes de variáveis/funções em inglês. Exceção deliberada desta sessão: descrição do repositório GitHub em inglês, para alcance junto de recrutadores.
 - Atualizar este ficheiro sempre que se fechar um bloco de trabalho coerente (fim de fase, ou marco relevante dentro de uma fase).
 - No fim de cada sessão, sugerir um título em `kebab-case` resumindo o que foi feito, para facilitar localizar sessões antigas mais tarde.
-- Ao colar blocos de código grandes, verificar sempre a indentação final (já aconteceu duas vezes nesta sessão: métodos a ficarem fora da classe por engano).
+- Ao colar blocos de código grandes, verificar sempre a indentação final.
+- Sempre que uma chamada de rede falhar de forma inesperada, testar primeiro com uma ferramenta fora do Python (`Invoke-WebRequest`) antes de assumir que é bug de código — pode ser interferência do sistema (antivírus, firewall), como aconteceu nesta sessão.
 
 ## Título desta sessão
 
-`gui-pyside6-crud-completo-com-pesquisa`
+`isbn-lookup-polimento-gui-publicacao-github`
