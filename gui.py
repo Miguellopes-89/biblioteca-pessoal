@@ -3,7 +3,7 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFormLayout,
     QLineEdit, QPushButton, QMessageBox, QComboBox,
-    QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,
 )
 
 from database import add_book, create_tables, list_books, update_book, delete_book, search_books
@@ -110,6 +110,14 @@ class JanelaPrincipal(QMainWindow):
         self.tabela_livros.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # só leitura, por agora
         self.tabela_livros.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabela_livros.itemSelectionChanged.connect(self.linha_selecionada)
+
+        # ID encolhe ao mínimo necessário; Título ocupa o espaço sobrante (é o
+        # campo mais variável em comprimento); as restantes ajustam-se ao conteúdo.
+        cabecalho = self.tabela_livros.horizontalHeader()
+        cabecalho.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        cabecalho.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for coluna in range(2, len(colunas)):
+            cabecalho.setSectionResizeMode(coluna, QHeaderView.ResizeMode.ResizeToContents)
 
         # --- Junta tudo num layout vertical: formulário, pesquisa, tabela ---
         layout_principal = QVBoxLayout()
