@@ -5,7 +5,7 @@ import unicodedata
 DB_NAME = "biblioteca.db"
 
 
-def normalize_text(texto):
+def normalize_text(texto: str | None) -> str:
     """
     Normaliza texto para comparação/pesquisa insensível a acentos, maiúsculas e pontuação.
     Ex.: "É, Um Ólá!" -> "e um ola"
@@ -25,7 +25,7 @@ def normalize_text(texto):
     return texto
 
 
-def connect():
+def connect() -> sqlite3.Connection:
     """Abre ligação à base de dados e ativa verificação de chaves estrangeiras."""
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = ON")  # SQLite não valida FKs por omissão
@@ -33,7 +33,7 @@ def connect():
     return conn
 
 
-def create_tables():
+def create_tables() -> None:
     """Cria as tabelas se ainda não existirem. Seguro chamar repetidamente."""
     conn = connect()
     cursor = conn.cursor()
@@ -80,7 +80,7 @@ def create_tables():
     conn.close()
 
 
-def get_or_create_author(cursor, nome):
+def get_or_create_author(cursor: sqlite3.Cursor, nome: str) -> int:
     """Devolve o id do autor. Se não existir (comparação insensível a maiúsculas), cria-o."""
     cursor.execute(
         "SELECT id FROM autores WHERE LOWER(nome) = LOWER(?)", (nome,)
@@ -91,10 +91,22 @@ def get_or_create_author(cursor, nome):
         return resultado[0]  # autor já existia
 
     cursor.execute("INSERT INTO autores (nome) VALUES (?)", (nome,))
+    # a seguir a um INSERT bem-sucedido, lastrowid nunca é None — o assert
+    # documenta essa garantia para o type checker (sem ele, a assinatura
+    # "-> int" entraria em conflito com o tipo real "int | None")
+    assert cursor.lastrowid is not None
     return cursor.lastrowid  # id do autor recém-criado
 
 
-def add_book(titulo, editora, colecao, genero, isbn, autores_str, estado_leitura="não lido"):
+def add_book(
+    titulo: str,
+    editora: str | None,
+    colecao: str | None,
+    genero: str | None,
+    isbn: str | None,
+    autores_str: str,
+    estado_leitura: str = "não lido",
+) -> int | None:
     """
     Insere um livro e associa-o aos seus autores.
     autores_str: nomes separados por vírgula, ex. "Fabcaro, Conrad"
@@ -127,7 +139,7 @@ def add_book(titulo, editora, colecao, genero, isbn, autores_str, estado_leitura
     return livro_id
 
 
-def list_books():
+def list_books() -> list[dict[str, str | int | None]]:
     """
     Devolve todos os livros como uma lista de dicionários, ordenados por título.
     Cada dicionário inclui os autores associados numa única string (separados por vírgula).
@@ -158,7 +170,7 @@ def list_books():
     return [dict(linha) for linha in resultados]
 
 
-def search_books(termo):
+def search_books(termo: str) -> list[dict[str, str | int | None]]:
     """
     Pesquisa livros por título, editora ou nome de autor, ignorando acentos,
     maiúsculas e pontuação (usa normalize_text nos dois lados da comparação).
@@ -209,7 +221,16 @@ def search_books(termo):
     return [dict(linha) for linha in resultados]
 
 
-def update_book(livro_id, titulo=None, editora=None, colecao=None, genero=None, isbn=None, autores_str=None, estado_leitura=None):
+def update_book(
+    livro_id: int,
+    titulo: str | None = None,
+    editora: str | None = None,
+    colecao: str | None = None,
+    genero: str | None = None,
+    isbn: str | None = None,
+    autores_str: str | None = None,
+    estado_leitura: str | None = None,
+) -> bool:
     """
     Atualiza os campos fornecidos de um livro existente, identificado por livro_id.
     Campos não fornecidos (None) mantêm o valor atual — permite atualizações parciais,
@@ -263,7 +284,7 @@ def update_book(livro_id, titulo=None, editora=None, colecao=None, genero=None, 
     return True
 
 
-def delete_book(livro_id):
+def delete_book(livro_id: int) -> bool:
     """
     Remove um livro e as suas associações a autores (linhas em livro_autor).
     Os autores em si NÃO são removidos, mesmo que fiquem sem nenhum livro associado
