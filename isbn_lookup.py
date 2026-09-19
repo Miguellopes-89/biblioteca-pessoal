@@ -33,35 +33,53 @@ TENTATIVAS = 3
 PAUSA_ENTRE_TENTATIVAS_SEGUNDOS = 1
 
 
-def _pedir_json(url: str) -> dict | None:
-    """Faz um GET ao url e devolve o corpo interpretado como JSON, ou None
-    se todas as tentativas falharem (rede, timeout, HTTP de erro, JSON inválido).
+def _pedir_bytes(url: str) -> bytes | None:
+    """Faz um GET ao url e devolve o corpo em bruto (bytes), ou None se
+    todas as tentativas falharem (rede, timeout, HTTP de erro).
 
-    Repete o pedido até TENTATIVAS vezes: falhas de rede transitórias
-    (reset de ligação, timeout pontual) são normais e não devem impedir
-    uma pesquisa que, à tentativa seguinte, teria funcionado.
-
-    Centraliza aqui o tratamento de erros para as duas funções de fetch
-    não repetirem o mesmo bloco try/except duas vezes.
+    Repete o pedido até TENTATIVAS vezes, pela mesma razão descrita no
+    cabeçalho deste ficheiro: falhas de rede transitórias nesta máquina.
+    Usada tanto para respostas JSON (_pedir_json) como para imagens
+    de capa (baixar_capa) — evita duplicar a lógica de retry duas vezes.
     """
     pedido = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 
-    corpo = None
     for tentativa in range(1, TENTATIVAS + 1):
         try:
             with urllib.request.urlopen(pedido, timeout=TIMEOUT_SEGUNDOS) as resposta:
-                corpo = resposta.read()
-            break
+                return resposta.read()
         except (urllib.error.URLError, TimeoutError):
-            # Cobre falhas de rede, DNS, timeout, e HTTPError (subclasse de URLError)
             if tentativa == TENTATIVAS:
                 return None
             time.sleep(PAUSA_ENTRE_TENTATIVAS_SEGUNDOS)
+
+    return None
+
+
+def _pedir_json(url: str) -> dict | None:
+    """Faz um GET ao url e devolve o corpo interpretado como JSON, ou None
+    se o pedido falhar ou a resposta não for JSON válido.
+    """
+    corpo = _pedir_bytes(url)
+    if corpo is None:
+        return None
 
     try:
         return json.loads(corpo)
     except json.JSONDecodeError:
         return None
+
+
+def baixar_capa(url: str) -> bytes | None:
+    """Descarrega os bytes de uma imagem de capa a partir do seu URL.
+
+    Devolve None se o url for vazio ou se o download falhar (mesmo depois
+    das repetições em _pedir_bytes). Quem chamar esta função deve sempre
+    verificar o resultado antes de o usar (nem toda a API tem sempre capa).
+    """
+    if not url:
+        return None
+    return _pedir_bytes(url)
 
 
 def _fetch_google_books(isbn: str) -> dict | None:
@@ -78,6 +96,8 @@ def _fetch_google_books(isbn: str) -> dict | None:
         "autores_str": ", ".join(info.get("authors", [])),
         "editora": info.get("publisher", ""),
         "genero": ", ".join(info.get("categories", [])),
+        # .replace(...) porque a Google Books por vezes devolve http:// em vez de https://
+        "capa_url": info.get("imageLinks", {}).get("thumbnail", "").replace("http://", "https://"),
     }
 
 
@@ -99,6 +119,7 @@ def _fetch_open_library(isbn: str) -> dict | None:
         "autores_str": ", ".join(autores),
         "editora": ", ".join(editoras),
         "genero": "",  # Open Library não expõe "subjects" de forma fiável neste endpoint
+        "capa_url": info.get("cover", {}).get("medium", ""),
     }
 
 

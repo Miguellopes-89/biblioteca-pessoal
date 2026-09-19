@@ -1,13 +1,14 @@
 import sys
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, Signal, Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFormLayout,
-    QLineEdit, QPushButton, QMessageBox, QComboBox,
+    QLineEdit, QPushButton, QMessageBox, QComboBox, QLabel,
     QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,
 )
 
 from database import add_book, create_tables, list_books, update_book, delete_book, search_books
-from isbn_lookup import lookup_isbn, validar_isbn
+from isbn_lookup import lookup_isbn, validar_isbn, baixar_capa
 
 
 class PesquisaISBNThread(QThread):
@@ -25,8 +26,23 @@ class PesquisaISBNThread(QThread):
         self.isbn = isbn
 
     def run(self):
-        resultado = lookup_isbn(self.isbn)
-        self.resultado_pronto.emit(resultado)
+        # Envolvido em try/except só para diagnóstico: se algo rebentar aqui
+        # dentro do thread, o Qt por vezes engole a exceção sem mostrar nada
+        # no terminal, e o botão "Procurar" fica preso para sempre. Isto
+        # garante que vemos sempre o erro real, e que o sinal é sempre
+        # emitido (o botão volta ao normal mesmo que a pesquisa falhe).
+        try:
+            resultado = lookup_isbn(self.isbn)
+
+            if resultado is not None:
+                resultado["capa_bytes"] = baixar_capa(resultado.get("capa_url", ""))
+
+            self.resultado_pronto.emit(resultado)
+        except Exception:
+            import traceback
+            print("--- ERRO dentro do thread de pesquisa ISBN ---")
+            traceback.print_exc()
+            self.resultado_pronto.emit(None)
 
 
 class JanelaPrincipal(QMainWindow):
@@ -119,9 +135,19 @@ class JanelaPrincipal(QMainWindow):
         for coluna in range(2, len(colunas)):
             cabecalho.setSectionResizeMode(coluna, QHeaderView.ResizeMode.ResizeToContents)
 
-        # --- Junta tudo num layout vertical: formulário, pesquisa, tabela ---
+                # --- Pré-visualização da capa (só preview, não é guardada) ---
+        self.label_capa = QLabel("Sem\ncapa")
+        self.label_capa.setFixedSize(120, 180)
+        self.label_capa.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_capa.setStyleSheet("border: 1px solid gray;")
+
+        formulario_e_capa_layout = QHBoxLayout()
+        formulario_e_capa_layout.addLayout(form_layout)
+        formulario_e_capa_layout.addWidget(self.label_capa)
+
+                # --- Junta tudo num layout vertical: formulário+capa, pesquisa, tabela ---
         layout_principal = QVBoxLayout()
-        layout_principal.addLayout(form_layout)
+        layout_principal.addLayout(formulario_e_capa_layout)
         layout_principal.addLayout(pesquisa_layout)
         layout_principal.addWidget(self.tabela_livros)
         widget_central.setLayout(layout_principal)
@@ -174,6 +200,20 @@ class JanelaPrincipal(QMainWindow):
             self.campo_editora.setText(resultado["editora"])
         if resultado["genero"]:
             self.campo_genero.setText(resultado["genero"])
+
+        capa_bytes = resultado.get("capa_bytes")
+        if capa_bytes:
+            pixmap = QPixmap()
+            pixmap.loadFromData(capa_bytes)
+            pixmap = pixmap.scaled(
+                self.label_capa.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.label_capa.setPixmap(pixmap)
+        else:
+            self.label_capa.clear()
+            self.label_capa.setText("Sem\ncapa")
 
     def linha_selecionada(self):
         # Usar selectedItems() em vez de currentRow(): clearSelection() dispara
@@ -262,6 +302,8 @@ class JanelaPrincipal(QMainWindow):
         self.campo_genero.clear()
         self.campo_isbn.clear()
         self.campo_estado_leitura.setCurrentIndex(0)  # volta a "não lido"
+        self.label_capa.clear()
+        self.label_capa.setText("Sem\ncapa")
         self.livro_selecionado_id = None
         self.botao_adicionar.setText("Adicionar Livro")
         self.tabela_livros.clearSelection()
