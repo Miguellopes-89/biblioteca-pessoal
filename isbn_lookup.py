@@ -26,6 +26,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import Any
 
 TIMEOUT_SEGUNDOS = 10
 USER_AGENT = "biblioteca-pessoal/1.0 (projeto pessoal de portefolio)"
@@ -56,7 +57,7 @@ def _pedir_bytes(url: str) -> bytes | None:
     return None
 
 
-def _pedir_json(url: str) -> dict | None:
+def _pedir_json(url: str) -> dict[str, Any] | None:
     """Faz um GET ao url e devolve o corpo interpretado como JSON, ou None
     se o pedido falhar ou a resposta não for JSON válido.
     """
@@ -82,7 +83,7 @@ def baixar_capa(url: str) -> bytes | None:
     return _pedir_bytes(url)
 
 
-def _fetch_google_books(isbn: str) -> dict | None:
+def _fetch_google_books(isbn: str) -> dict[str, str] | None:
     """Consulta a Google Books API. Devolve dict normalizado ou None."""
     query = urllib.parse.urlencode({"q": f"isbn:{isbn}"})
     dados = _pedir_json(f"https://www.googleapis.com/books/v1/volumes?{query}")
@@ -101,7 +102,7 @@ def _fetch_google_books(isbn: str) -> dict | None:
     }
 
 
-def _fetch_open_library(isbn: str) -> dict | None:
+def _fetch_open_library(isbn: str) -> dict[str, str] | None:
     """Consulta a Open Library API. Devolve dict normalizado ou None."""
     query = urllib.parse.urlencode({"bibkeys": f"ISBN:{isbn}", "format": "json", "jscmd": "data"})
     dados = _pedir_json(f"https://openlibrary.org/api/books?{query}")
@@ -157,7 +158,7 @@ def validar_isbn(isbn: str) -> bool:
     return False
 
 
-def lookup_isbn(isbn: str) -> dict | None:
+def lookup_isbn(isbn: str) -> dict[str, str] | None:
     """Procura os metadados de um livro pelo ISBN.
 
     Tenta primeiro a Google Books; se não encontrar nada, tenta a Open

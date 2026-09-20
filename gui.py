@@ -34,10 +34,14 @@ class PesquisaISBNThread(QThread):
         try:
             resultado = lookup_isbn(self.isbn)
 
+            resultado_completo: dict[str, str | bytes | None] | None = None
             if resultado is not None:
-                resultado["capa_bytes"] = baixar_capa(resultado.get("capa_url", ""))
+                resultado_completo = {
+                    **resultado,
+                    "capa_bytes": baixar_capa(resultado.get("capa_url", "")),
+                }
 
-            self.resultado_pronto.emit(resultado)
+            self.resultado_pronto.emit(resultado_completo)
         except Exception:
             import traceback
             print("--- ERRO dentro do thread de pesquisa ISBN ---")
@@ -135,7 +139,7 @@ class JanelaPrincipal(QMainWindow):
         for coluna in range(2, len(colunas)):
             cabecalho.setSectionResizeMode(coluna, QHeaderView.ResizeMode.ResizeToContents)
 
-                # --- Pré-visualização da capa (só preview, não é guardada) ---
+        # --- Pré-visualização da capa (só preview, não é guardada) ---
         self.label_capa = QLabel("Sem\ncapa")
         self.label_capa.setFixedSize(120, 180)
         self.label_capa.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -145,7 +149,7 @@ class JanelaPrincipal(QMainWindow):
         formulario_e_capa_layout.addLayout(form_layout)
         formulario_e_capa_layout.addWidget(self.label_capa)
 
-                # --- Junta tudo num layout vertical: formulário+capa, pesquisa, tabela ---
+        # --- Junta tudo num layout vertical: formulário+capa, pesquisa, tabela ---
         layout_principal = QVBoxLayout()
         layout_principal.addLayout(formulario_e_capa_layout)
         layout_principal.addLayout(pesquisa_layout)
@@ -215,6 +219,19 @@ class JanelaPrincipal(QMainWindow):
             self.label_capa.clear()
             self.label_capa.setText("Sem\ncapa")
 
+    def _texto_celula(self, linha: int, coluna: int) -> str:
+        """Devolve o texto da célula (linha, coluna) da tabela de livros.
+
+        preencher_tabela() cria sempre um QTableWidgetItem para todas as
+        colunas de cada linha, por isso na prática o item nunca é None
+        quando há uma linha selecionada. O assert documenta essa garantia
+        para o basedpyright (que não a consegue provar sozinho) e falharia
+        ruidosamente se essa premissa alguma vez deixasse de ser verdade.
+        """
+        item = self.tabela_livros.item(linha, coluna)
+        assert item is not None
+        return item.text()
+
     def linha_selecionada(self):
         # Usar selectedItems() em vez de currentRow(): clearSelection() dispara
         # este mesmo sinal (itemSelectionChanged), mas currentRow() continua a
@@ -228,14 +245,14 @@ class JanelaPrincipal(QMainWindow):
         if linha_atual < 0:
             return
 
-        self.livro_selecionado_id = int(self.tabela_livros.item(linha_atual, 0).text())
-        self.campo_titulo.setText(self.tabela_livros.item(linha_atual, 1).text())
-        self.campo_autores.setText(self.tabela_livros.item(linha_atual, 2).text())
-        self.campo_editora.setText(self.tabela_livros.item(linha_atual, 3).text())
-        self.campo_colecao.setText(self.tabela_livros.item(linha_atual, 4).text())
-        self.campo_genero.setText(self.tabela_livros.item(linha_atual, 5).text())
-        self.campo_isbn.setText(self.tabela_livros.item(linha_atual, 6).text())
-        self.campo_estado_leitura.setCurrentText(self.tabela_livros.item(linha_atual, 7).text())
+        self.livro_selecionado_id = int(self._texto_celula(linha_atual, 0))
+        self.campo_titulo.setText(self._texto_celula(linha_atual, 1))
+        self.campo_autores.setText(self._texto_celula(linha_atual, 2))
+        self.campo_editora.setText(self._texto_celula(linha_atual, 3))
+        self.campo_colecao.setText(self._texto_celula(linha_atual, 4))
+        self.campo_genero.setText(self._texto_celula(linha_atual, 5))
+        self.campo_isbn.setText(self._texto_celula(linha_atual, 6))
+        self.campo_estado_leitura.setCurrentText(self._texto_celula(linha_atual, 7))
 
         self.botao_adicionar.setText("Guardar Alterações")
 
