@@ -139,6 +139,41 @@ def add_book(
     return livro_id
 
 
+def get_book(livro_id: int) -> dict[str, str | int | None] | None:
+    """
+    Devolve um único livro pelo id, no mesmo formato que list_books() usa
+    para cada linha (inclui os autores concatenados numa string). Usado
+    para pré-preencher formulários de edição (ex.: na versão web, onde o
+    id vem da URL em vez de uma seleção na tabela).
+
+    Devolve None se o id não existir.
+    """
+    conn = connect()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            livros.id,
+            livros.titulo,
+            livros.editora,
+            livros.colecao,
+            livros.genero,
+            livros.isbn,
+            livros.estado_leitura,
+            GROUP_CONCAT(autores.nome, ', ') AS autores
+        FROM livros
+        LEFT JOIN livro_autor ON livros.id = livro_autor.livro_id
+        LEFT JOIN autores ON livro_autor.autor_id = autores.id
+        WHERE livros.id = ?
+        GROUP BY livros.id
+    """, (livro_id,))
+
+    resultado = cursor.fetchone()
+    conn.close()
+
+    return dict(resultado) if resultado else None
+
+
 def list_books() -> list[dict[str, str | int | None]]:
     """
     Devolve todos os livros como uma lista de dicionários, ordenados por título.

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Livro — Biblioteca Pessoal</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; max-width: 500px; }
+        label { display: block; margin-top: 1rem; font-weight: bold; }
+        input, select { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+        button { margin-top: 1.5rem; padding: 0.6rem 1.2rem; }
+        .erro { color: #b00020; font-weight: bold; }
+        a { display: inline-block; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Editar Livro</h1>
+
+    {% if erro %}
+    <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    <form method="POST">
+        <label for="titulo">Título:</label>
+        <input type="text" id="titulo" name="titulo" value="{{ livro.titulo }}" required>
+
+        <label for="autores_str">Autores:</label>
+        <input type="text" id="autores_str" name="autores_str" value="{{ livro.autores or '' }}" placeholder="separados por vírgula, ex.: Fabcaro, Conrad">
+
+        <label for="editora">Editora:</label>
+        <input type="text" id="editora" name="editora" value="{{ livro.editora or '' }}">
+
+        <label for="colecao">Coleção:</label>
+        <input type="text" id="colecao" name="colecao" value="{{ livro.colecao or '' }}">
+
+        <label for="genero">Género:</label>
+        <input type="text" id="genero" name="genero" value="{{ livro.genero or '' }}">
+
+        <label for="isbn">ISBN:</label>
+        <input type="text" id="isbn" name="isbn" value="{{ livro.isbn or '' }}">
+
+        <label for="estado_leitura">Estado de leitura:</label>
+        <select id="estado_leitura" name="estado_leitura">
+            <option value="não lido" {% if livro.estado_leitura == "não lido" %}selected{% endif %}>não lido</option>
+            <option value="a ler" {% if livro.estado_leitura == "a ler" %}selected{% endif %}>a ler</option>
+            <option value="lido" {% if livro.estado_leitura == "lido" %}selected{% endif %}>lido</option>
+        </select>
+
+        <button type="submit">Guardar Alterações</button>
+    </form>
+
+    <a href="{{ url_for('index') }}">&larr; Voltar à lista</a>
+</body>
+</html>
