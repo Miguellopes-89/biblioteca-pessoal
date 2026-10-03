@@ -1,8 +1,13 @@
 import re
 import sqlite3
 import unicodedata
+from pathlib import Path
 
-DB_NAME = "biblioteca.db"
+# Caminho absoluto, calculado a partir da localização DESTE ficheiro (e não do
+# diretório de onde o programa foi lançado). Assim, a base de dados é sempre a
+# mesma, corra-se a GUI, o Flask ou os testes a partir de qualquer pasta.
+# Os testes substituem este valor por um ficheiro temporário (monkeypatch).
+DB_NAME = str(Path(__file__).resolve().parent / "biblioteca.db")
 
 
 def normalize_text(texto: str | None) -> str:
@@ -30,6 +35,9 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = ON")  # SQLite não valida FKs por omissão
     conn.row_factory = sqlite3.Row  # permite aceder às colunas por nome e converter para dict()
+    # regista normalize_text como função SQL "normalizar", utilizável em qualquer
+    # query desta ligação (pesquisa e ordenação insensíveis a acentos e maiúsculas)
+    conn.create_function("normalizar", 1, normalize_text)
     return conn
 
 
@@ -176,7 +184,8 @@ def get_book(livro_id: int) -> dict[str, str | int | None] | None:
 
 def list_books() -> list[dict[str, str | int | None]]:
     """
-    Devolve todos os livros como uma lista de dicionários, ordenados por título.
+    Devolve todos os livros como uma lista de dicionários, ordenados por título
+    (ignorando maiúsculas e acentos; o título exato desempata).
     Cada dicionário inclui os autores associados numa única string (separados por vírgula).
     """
     conn = connect()
@@ -196,7 +205,7 @@ def list_books() -> list[dict[str, str | int | None]]:
         LEFT JOIN livro_autor ON livros.id = livro_autor.livro_id
         LEFT JOIN autores ON livro_autor.autor_id = autores.id
         GROUP BY livros.id
-        ORDER BY livros.titulo
+        ORDER BY normalizar(livros.titulo), livros.titulo
     """)
 
     resultados = cursor.fetchall()
@@ -219,9 +228,7 @@ def search_books(termo: str) -> list[dict[str, str | int | None]]:
     """
     termo_normalizado = normalize_text(termo)
 
-    conn = connect()
-    # regista normalize_text como função SQL "normalizar", utilizável dentro da query
-    conn.create_function("normalizar", 1, normalize_text)
+    conn = connect()  # já traz a função SQL "normalizar" registada
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -247,7 +254,7 @@ def search_books(termo: str) -> list[dict[str, str | int | None]]:
                OR normalizar(autores.nome) LIKE '%' || ? || '%'
         )
         GROUP BY livros.id
-        ORDER BY livros.titulo
+        ORDER BY normalizar(livros.titulo), livros.titulo
     """, (termo_normalizado, termo_normalizado, termo_normalizado))
 
     resultados = cursor.fetchall()
