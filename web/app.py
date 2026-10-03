@@ -3,10 +3,13 @@
 dados SQLite que a app desktop (gui.py) usa — não é uma cópia dos dados,
 é a mesma base de dados, vista a partir de outra interface.
 
-IMPORTANTE: corre sempre a partir da raiz do projeto, não de dentro de web/,
-para que "biblioteca.db" seja encontrado no sítio certo:
+Corre-se com:
 
     python web/app.py
+
+Nota: desde que database.py passou a usar um caminho absoluto para
+"biblioteca.db", já não importa a pasta de onde este comando é lançado —
+a base de dados é sempre a mesma que a app desktop usa.
 """
 
 import os
@@ -19,16 +22,61 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from flask import Flask, redirect, render_template, request, url_for
 
-from database import add_book, create_tables, delete_book, get_book, list_books, update_book
+from database import add_book, create_tables, delete_book, get_book, list_books, search_books, update_book
+from isbn_lookup import lookup_isbn, validar_isbn
 
 app = Flask(__name__)
 
 
 @app.route("/")
 def index():
-    """Página inicial: lista todos os livros, tal como a tabela da app desktop."""
-    livros = list_books()
-    return render_template("index.html", livros=livros)
+    """Página inicial: lista todos os livros, ou os resultados da pesquisa
+    se houver um termo em ?q=... na URL.
+
+    GET (não POST) é a escolha certa aqui: pesquisar não cria nem altera
+    nada, e ter o termo na URL (em vez de num formulário POST) torna o
+    resultado pesquisável, partilhável e sujeito ao botão "recuar" do
+    browser, tal como uma pesquisa no Google.
+    """
+    termo = request.args.get("q", "").strip()
+    livros = search_books(termo) if termo else list_books()
+    return render_template("index.html", livros=livros, termo=termo)
+
+
+@app.route("/pesquisar-isbn")
+def pesquisar_isbn():
+    """Endpoint JSON chamado por fetch() a partir do botão "Procurar" em
+    adicionar.html. Reutiliza validar_isbn() e lookup_isbn() sem qualquer
+    alteração — exatamente a mesma lógica da GUI, só sem QThread: este
+    pedido HTTP fica bloqueado até a cascata Google Books -> Open Library
+    (com as suas repetições) terminar.
+
+    Não chama baixar_capa(): ao contrário da GUI (que precisa dos bytes
+    para um QPixmap), o browser consegue carregar a imagem diretamente a
+    partir de capa_url num <img src="...">, sem passar pelo servidor.
+
+    Usa códigos de estado HTTP (400/404) em vez de um campo "encontrado"
+    no corpo — o JavaScript em adicionar.html já verifica resposta.ok.
+    """
+    isbn = request.args.get("isbn", "").strip()
+
+    if not isbn:
+        return {"erro": "Escreve um ISBN no campo antes de procurar."}, 400
+
+    if not validar_isbn(isbn):
+        return {
+            "erro": "Este ISBN não tem um dígito de controlo válido — confirma se não há nenhum algarismo trocado.",
+        }, 400
+
+    resultado = lookup_isbn(isbn)
+    if resultado is None:
+        return {
+            "erro": "Não foi possível encontrar este ISBN (nem na Google Books, nem na Open Library).",
+        }, 404
+
+    # Flask converte um dict devolvido diretamente numa resposta JSON,
+    # sem precisar de chamar jsonify() explicitamente.
+    return resultado
 
 
 @app.route("/adicionar", methods=["GET", "POST"])

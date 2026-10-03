@@ -15,6 +15,18 @@
 
     <p><a href="{{ url_for('adicionar') }}">+ Adicionar livro</a></p>
 
+    <form method="GET" action="{{ url_for('index') }}">
+        <input type="text" name="q" value="{{ termo }}" placeholder="Pesquisar por título, editora ou autor...">
+        <button type="submit">Pesquisar</button>
+        {% if termo %}
+            <a href="{{ url_for('index') }}">Limpar</a>
+        {% endif %}
+    </form>
+
+    {% if termo %}
+        <p>{{ livros|length }} resultado(s) para "{{ termo }}"</p>
+    {% endif %}
+
     <table>
         <thead>
             <tr>

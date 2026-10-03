@@ -36,7 +36,12 @@
         <input type="text" id="genero" name="genero">
 
         <label for="isbn">ISBN:</label>
-        <input type="text" id="isbn" name="isbn">
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="isbn" name="isbn" style="flex: 1;">
+            <button type="button" id="btn-procurar" onclick="procurarISBN()">Procurar</button>
+        </div>
+        <p id="mensagem-isbn" style="margin: 0.3rem 0 0; font-size: 0.9rem;"></p>
+        <img id="capa-preview" src="" alt="Capa do livro" style="display: none; max-width: 120px; margin-top: 0.5rem;">
 
         <label for="estado_leitura">Estado de leitura:</label>
         <select id="estado_leitura" name="estado_leitura">
@@ -49,5 +54,61 @@
     </form>
 
     <a href="{{ url_for('index') }}">&larr; Voltar à lista</a>
+
+    <script>
+        async function procurarISBN() {
+            const campoIsbn = document.getElementById("isbn");
+            const botao = document.getElementById("btn-procurar");
+            const mensagem = document.getElementById("mensagem-isbn");
+            const capa = document.getElementById("capa-preview");
+            const isbn = campoIsbn.value.trim();
+
+            mensagem.textContent = "";
+            capa.style.display = "none";
+
+            if (!isbn) {
+                mensagem.textContent = "Escreve um ISBN antes de procurar.";
+                return;
+            }
+
+            // Feedback visual durante a espera síncrona: o pedido ao Flask
+            // só volta depois de lookup_isbn() acabar (incluindo retries),
+            // por isso o botão fica desativado para não disparar pedidos
+            // repetidos enquanto isso corre.
+            botao.disabled = true;
+            botao.textContent = "A procurar...";
+
+            try {
+                const resposta = await fetch(`/pesquisar-isbn?isbn=${encodeURIComponent(isbn)}`);
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    mensagem.textContent = dados.erro || "Erro ao procurar.";
+                    return;
+                }
+
+                // Preenchimento seletivo: só substitui campos que a API trouxe
+                // com conteúdo, tal como a GUI faz — nunca apaga o que o
+                // utilizador já tinha escrito à mão (ex. coleção, que
+                // nenhuma das duas APIs expõe).
+                if (dados.titulo) document.getElementById("titulo").value = dados.titulo;
+                if (dados.autores_str) document.getElementById("autores_str").value = dados.autores_str;
+                if (dados.editora) document.getElementById("editora").value = dados.editora;
+                if (dados.genero) document.getElementById("genero").value = dados.genero;
+
+                if (dados.capa_url) {
+                    capa.src = dados.capa_url;
+                    capa.style.display = "block";
+                }
+
+                mensagem.textContent = "Livro encontrado.";
+            } catch (erro) {
+                mensagem.textContent = "Erro de rede ao contactar o servidor.";
+            } finally {
+                botao.disabled = false;
+                botao.textContent = "Procurar";
+            }
+        }
+    </script>
 </body>
 </html>
