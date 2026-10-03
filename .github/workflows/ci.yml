@@ -1,0 +1,46 @@
+name: CI
+
+# Corre em cada push para a main e em cada pull request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# O CI só precisa de ler o código; nunca de escrever no repositório.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter o código
+        uses: actions/checkout@v7
+
+      - name: Instalar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          # guarda os pacotes descarregados entre execuções (PySide6 é pesado)
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-web.txt
+            requirements-dev.txt
+
+      # O ambiente chama-se "venv" para coincidir com o pyrightconfig.json
+      # (venvPath/venv), que é onde o basedpyright procura os pacotes.
+      - name: Instalar dependências
+        run: |
+          python -m venv venv
+          venv/bin/python -m pip install --upgrade pip
+          venv/bin/python -m pip install -r requirements.txt -r requirements-web.txt -r requirements-dev.txt
+
+      - name: Correr os testes (pytest)
+        run: venv/bin/python -m pytest
+
+      # Falha só com ERROS de tipos. Os avisos aparecem no log mas não
+      # reprovam o CI (decisão deliberada: exigir zero avisos fica para depois).
+      - name: Verificar tipos (basedpyright)
+        run: venv/bin/basedpyright
