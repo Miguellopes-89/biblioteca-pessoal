@@ -1,5 +1,7 @@
 # Biblioteca Pessoal
 
+[![CI](https://github.com/Miguellopes-89/biblioteca-pessoal/actions/workflows/ci.yml/badge.svg)](https://github.com/Miguellopes-89/biblioteca-pessoal/actions/workflows/ci.yml)
+
 A desktop application to catalog a personal book collection, built with Python and PySide6. Add books manually or look them up automatically by ISBN, browse and search your collection, and track what you've read — all stored locally, no internet connection required once a book is in your library.
 
 This is a self-driven portfolio project built while transitioning into software development.
@@ -9,6 +11,9 @@ This is a self-driven portfolio project built while transitioning into software 
 - **Full CRUD** — add, list, search, edit, and remove books
 - **Automatic ISBN lookup** — fetches title, author(s), publisher, and genre from the Google Books API, falling back to Open Library if the first lookup doesn't find a match. Runs on a background thread so the interface never freezes while waiting on the network.
 - **Multiple authors per book**, stored as a proper many-to-many relationship (not a flat text field)
+- **ISBN validation** — checks the ISBN-10/ISBN-13 check digit before spending a network call, so typos are caught early
+- **Cover preview** — shows the book cover after an ISBN lookup, when the APIs provide one
+- **Optional web interface** (Flask) — the same library in a browser, with list, search, add, edit, remove and ISBN lookup, running on the same database as the desktop app
 - **Accent- and punctuation-insensitive search** — searching "meditacoes" finds "Meditações"
 - **Reading status tracking** (not read / reading / read)
 - **Fully offline** after a book is added — the SQLite database is local, no server or account needed
@@ -20,6 +25,8 @@ This is a self-driven portfolio project built while transitioning into software 
 - **PySide6** (Qt for Python) — desktop GUI
 - **SQLite** — local storage, accessed through the standard library `sqlite3` module
 - **`urllib.request`** (standard library) — ISBN lookups, with no external HTTP dependency
+- **Flask** — optional web interface
+- **pytest**, **basedpyright** and **GitHub Actions** — automated tests, static type checking and continuous integration
 
 ## Getting started
 
@@ -52,16 +59,41 @@ python gui.py
 
 The SQLite database (`biblioteca.db`) and its tables are created automatically on first run.
 
+### Web interface (optional)
+
+```bash
+pip install -r requirements-web.txt
+python web/app.py
+```
+
+Then open <http://127.0.0.1:5000>. This runs Flask's development server in debug mode, so it is meant for local use only — do not expose it to a network.
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The tests cover ISBN validation, text normalization and the data layer. Data-layer tests run against a temporary database, never against your real library. GitHub Actions runs the tests and the type checker on every push.
+
 ## Project structure
 
 ```
 biblioteca-pessoal/
-├── gui.py            # PySide6 desktop interface (QMainWindow)
-├── database.py        # SQLite data layer: schema, CRUD, search
-├── isbn_lookup.py      # ISBN lookup: Google Books + Open Library, with retry
-├── main.py            # original environment smoke test (not used by the GUI)
-├── requirements.txt
-└── pyrightconfig.json   # points the linter at the project's venv
+├── gui.py                # PySide6 desktop interface (QMainWindow)
+├── database.py           # SQLite data layer: schema, CRUD, search
+├── isbn_lookup.py        # ISBN validation + lookup: Google Books + Open Library, with retry
+├── web/                  # optional Flask interface (reuses database.py and isbn_lookup.py)
+│   ├── app.py
+│   └── templates/
+├── tests/                # pytest suite
+├── .github/workflows/    # CI: tests + type checking
+├── main.py               # original environment smoke test (not used by the GUI)
+├── requirements.txt      # desktop app
+├── requirements-web.txt  # web interface
+├── requirements-dev.txt  # tests and type checking
+└── pyrightconfig.json    # type checker configuration
 ```
 
 ## Data model
@@ -82,9 +114,8 @@ ISBN is the sole duplicate-detection key (each edition of a book has its own ISB
 
 ## Roadmap
 
-- Web version (Flask/FastAPI + Docker) as a possible future phase
-- ISBN checksum validation before querying the APIs
-- Book cover thumbnails (both APIs return cover image URLs already)
+- Containerize the web interface with Docker, using a production WSGI server instead of Flask's development server
+- Tests for the web routes, and for the ISBN lookup against recorded API responses
 
 ## License
 

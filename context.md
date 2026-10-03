@@ -21,21 +21,16 @@ Claude atua como tutor sénior: explica o "porquê" de cada decisão, avança pa
 - **Caminho do projeto:** `C:\Users\User\Projetos\biblioteca-pessoal`
 - **Ambiente virtual:** ativar sempre: `.\venv\Scripts\Activate.ps1`
 - **Dependências no venv:** `PySide6` 6.11.2 (app desktop) + `Flask` 3.1.3 e as suas dependências (`blinker`, `click`, `itsdangerous`, `jinja2`, `markupsafe`, `werkzeug`) para a fase web. `requirements.txt` (só PySide6) e `requirements-web.txt` (só Flask) ficam separados deliberadamente — quem só quiser a app desktop não precisa de instalar o Flask.
-- **`basedpyright`:** instalado no venv (`pip install basedpyright`) para poder ser corrido a partir do terminal, além da integração no Zed. Estado atual: **0 erros, 121 avisos** em todo o projeto (avisos deixados deliberadamente por resolver — `reportUnusedCallResult`, `reportAny`, `reportUnannotatedClassAttribute`, etc.).
-- **Testes e CI (2026-10-03):** `pytest` 9.1.1 em `requirements-dev.txt` (com `basedpyright`), configuração em `pytest.ini` (`pythonpath = .`, `testpaths = tests`). Correr com `pytest` a partir da raiz, venv ativo. **39 testes, todos a passar**. CI em `.github/workflows/ci.yml` (GitHub Actions, `ubuntu-latest`, Python 3.14, `actions/checkout@v7`, `actions/setup-python@v6`): corre `pytest` e `basedpyright`; o basedpyright só reprova com erros (os 121 avisos não reprovam).
+- **`basedpyright`:** instalado no venv (`pip install basedpyright`) para poder ser corrido a partir do terminal, além da integração no Zed. Estado atual: **0 erros, 145 avisos** (eram 121 antes dos testes; os 24 novos são quase todos `reportUnusedCallResult` em `tests/test_database.py`) em todo o projeto (avisos deixados deliberadamente por resolver — `reportUnusedCallResult`, `reportAny`, `reportUnannotatedClassAttribute`, etc.).
+- **Testes e CI (2026-10-03):** `pytest` 9.1.1 em `requirements-dev.txt` (com `basedpyright`), configuração em `pytest.ini` (`pythonpath = .`, `testpaths = tests`). Correr com `pytest` a partir da raiz, venv ativo. **39 testes, todos a passar**. CI em `.github/workflows/ci.yml` (GitHub Actions, `ubuntu-latest`, Python 3.14, `actions/checkout@v7`, `actions/setup-python@v6`): corre `pytest` e `basedpyright`; `pyrightconfig.json` tem `"failOnWarnings": false`, por isso só erros de tipos reprovam o CI (e também o basedpyright local).
 - **Acesso de Claude ao PC:** desde 2026-09-19, o filesystem (`mcp__Filesystem__*`, restrito a `C:\Users\User\Projetos`) está ativo — Claude lê e edita ficheiros diretamente. **Não há acesso a shell/PowerShell** — comandos (incluindo `git`, `pip install`, correr `basedpyright`, correr `python web/app.py`) continuam a ser executados por Miguel, que cola o output de volta.
 - **Cuidado ao colar código no Zed:** continua a ser a causa mais comum de bugs nesta sessão (já aconteceu 4 vezes ao todo, contando sessões anteriores) — blocos com `if`/`try` a ficarem com indentação errada ao colar, umas vezes com erro de sintaxe óbvio, outras vezes como código morto sem erro nenhum. Confirmar sempre visualmente a indentação depois de colar.
 
 ## Estado atual do repositório Git
 
 - Branch única: `main`, remoto `origin` → `https://github.com/Miguellopes-89/biblioteca-pessoal.git` (público)
-- HEAD confirmado em 2026-10-03: `2c594cf` (versão web com CRUD), em sincronia com `origin/main`. Os commits do basedpyright e do CRUD web já estão feitos.
-- **Sugeridos no fim de 2026-10-03, ainda por confirmar como feitos** (4 commits, por ordem; o trabalho de pesquisa/lookup web estava por commitar desde sessões anteriores):
-  1. `git add web/app.py web/templates` — `Adiciona pesquisa e lookup de ISBN na versao web`
-  2. `git add database.py tests pytest.ini requirements-dev.txt .gitignore` — `Adiciona testes pytest, corrige caminho da BD e ordenacao insensivel a acentos`
-  3. `git add .github` — `Adiciona CI com GitHub Actions (pytest + basedpyright)`
-  4. `git add context.md` — `Atualiza context.md apos testes e CI`
-- Depois do push, acompanhar a primeira execução do CI com `gh run watch`; se falhar, `gh run view --log-failed` e colar o output.
+- HEAD em 2026-10-03: `e1ef006` (em sincronia com `origin/main`), depois de 5 commits nesta sessão: pesquisa/lookup web (`ff59bf1`), testes + correções de BD (`bbe831a`), CI (`b92e663`), context.md (`816a67a`), correção do CI (`e1ef006`). **Por commitar:** README atualizado (selo do CI, secções web/testes, estrutura, roadmap) e este context.md — sugerido: `git add README.md context.md` e `Atualiza README (selo CI, web, testes) e context.md`.
+- **CI validado:** última execução verde (`✓`, ~33 s). A primeira falhou só no passo do basedpyright (ver incidente 6); o pytest passou no Linux com Python 3.14.7.
 - Confirmar com `git log --oneline -8` e `git status` na próxima sessão antes de continuar
 - `.gitignore` cobre: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `*.db`, `.pytest_cache/`. `web/__pycache__/` confirmado como ignorado (não aparece no `git status`).
 
@@ -79,6 +74,8 @@ Inalterado desde a última sessão — ver histórico. Sem novidades no schema n
 4. **basedpyright: suspeita inicial errada.** No início desta sessão, suspeitou-se que os erros estariam no padrão `self.tabela_livros.item(...).text()` sem verificar `None`. Estava errado — esse padrão nunca gerou erro nenhum. Os erros reais eram: `dict` sem argumentos de tipo em `isbn_lookup.py` (4×) e um erro de indentação colada em `gui.py`. Lição: **correr o basedpyright a partir do terminal e ler a lista completa (ficheiro:linha:mensagem) antes de assumir onde está o problema** — o contador agregado na barra de estado do Zed (visível ao lado do separador de um ficheiro) é do projeto inteiro, não desse ficheiro.
 5. **Quarta ocorrência de falha simultânea das duas APIs de ISBN**, confirmada isoladamente com `Invoke-WebRequest` por API: Google Books com 429 (quota diária esgotada), Open Library com 503. Sem indicação de bug de código, mas já a quarta vez — começa a ser um padrão a vigiar, não só coincidência. Confirmação visual da capa continua por fazer.
 
+6. **O basedpyright reprova por omissão com avisos.** A primeira execução do CI falhou com `0 errors, 145 warnings` e exit code 1: no basedpyright, `failOnWarnings` vem ligado por omissão (diferente do pyright). Claude tinha afirmado, sem verificar, que avisos não reprovavam. Resolvido com `"failOnWarnings": false` em `pyrightconfig.json`. Lição: o código de saída de uma ferramenta nova confirma-se na prática (`gh run view --log-failed`), não se assume.
+
 ## Notas técnicas / decisões tomadas
 
 ### App desktop (decisões antigas, continuam válidas)
@@ -109,10 +106,10 @@ Cascata de APIs, `urllib.request`, retry simples, `QThread` para a rede, valida�
 2. ~~CRUD completo (adicionar, editar, remover)~~ — **feito e testado ponto a ponto**.
 3. ~~Pesquisa (reutilizar `search_books()`)~~ — **feito e testado**.
 4. ~~Lookup de ISBN na versão web~~ — **código feito e casos de erro testados; caminho de sucesso por validar, arrumado por decisão de Miguel (ver secção da versão web acima)**.
-5. ~~Testes automáticos + CI~~ — **testes feitos (39 a passar); CI escrito, por validar após o primeiro push** (ver secção Git).
+5. ~~Testes automáticos + CI~~ — **feito e validado** (39 testes a passar; CI verde no GitHub; selo do CI já no README).
 6. **Docker** — último passo da fase web: containerizar a app Flask já funcional. Antes de expor fora de localhost: tirar `debug=True` (o debugger do Werkzeug permite execução remota de código) e usar `gunicorn`; considerar proteção CSRF no formulário de remover (aceitável em localhost, mencionar no README).
 
-Opções discutidas para depois: (B) notebook de EDA com pandas sobre a própria biblioteca e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira de Miguel); selo "passing" do CI no README; testes das rotas Flask com o test client; testar o lookup de ISBN com respostas de API simuladas (para validar o caminho de sucesso sem depender da quota da Google Books).
+Opções discutidas para depois: (B) notebook de EDA com pandas sobre a própria biblioteca e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira de Miguel); limpar os 24 avisos novos dos testes (ou passar a modo estrito, zero avisos); testes das rotas Flask com o test client; testar o lookup de ISBN com respostas de API simuladas (para validar o caminho de sucesso sem depender da quota da Google Books).
 
 Backlog secundário, sem urgência:
 - Confirmar visualmente que uma capa aparece (bloqueado pela mesma falha das APIs de ISBN)
