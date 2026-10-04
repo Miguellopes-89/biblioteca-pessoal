@@ -21,7 +21,7 @@ Aplicação desktop em Python para catalogar livros pessoais (título, autor(es)
 ## Git
 
 - Branch única `main`, remoto `origin` → `https://github.com/Miguellopes-89/biblioteca-pessoal.git`
-- HEAD de partida desta sessão (2026-10-04): `3533b9c` "Atualiza estado Git no context.md" (em sincronia com `origin/main`). O bloco Docker (Dockerfile, .dockerignore, `database.py`, README, este ficheiro) ficou por commitar no fim da sessão. Este ficheiro não regista o HEAD de cada commit: confirmar sempre com `git log --oneline -8` e `git status` antes de continuar
+- HEAD no fim da sessão de 2026-10-04: `b9631fa` "Containeriza a interface web com Docker e gunicorn" (enviado para `origin/main`; bloco Docker incluído). Este ficheiro não regista o HEAD de cada commit: confirmar sempre com `git log --oneline -8` e `git status` antes de continuar
 - `.gitignore`: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `*.db`, `.pytest_cache/`
 
 ## Ficheiros
