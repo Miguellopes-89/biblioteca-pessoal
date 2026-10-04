@@ -47,3 +47,14 @@ Cascata de APIs, `urllib.request`, retry simples, `QThread` para a rede, valida�
 ## Modelo de dados
 
 Sem alterações de schema desde a última sessão (só `get_book`, uma função de leitura). Descrição das tabelas no README.
+
+## Docker (2026-10-04)
+
+- **Persistência: volume do Docker + variável `BIBLIOTECA_DB`** (opção B). Rejeitada a opção A (montar o `biblioteca.db` real no container): o SQLite protege contra escritas simultâneas com bloqueios do sistema operativo, que não atravessam a fronteira Windows/container; GUI e container a escrever ao mesmo tempo podiam corromper a BD. Custo assumido: o container tem a sua BD, separada da da desktop, o que contraria a ideia de "mesma base de dados" da fase web (válida só em desenvolvimento local). Consequência: `database.py` alterado numa linha (`DB_NAME = os.environ.get("BIBLIOTECA_DB", <caminho anterior>)`), comportamento por omissão igual; 39 testes continuaram a passar.
+- **`create_tables()` no `CMD`**: o `gunicorn` não passa pelo bloco `__main__` do `app.py`, por isso, numa BD nova e vazia, a app arrancaria sem tabelas. Resolvido no `Dockerfile` sem tocar no `app.py`.
+- **`debug=True`** deixa de estar ativo no container pelo mesmo motivo (fecha o risco de execução remota de código do debugger do Werkzeug).
+- **`gunicorn==26.2.0` só na imagem**, não em `requirements-web.txt` (não corre em Windows). Versão fixada a partir do log do primeiro build.
+- **`.dockerignore`** exclui `*.db`, `.env`, `venv/`, `.git`, `tests/`, `docs/`; o `Dockerfile` copia só `database.py`, `isbn_lookup.py` e `web/`, para os dados pessoais não ficarem embutidos na imagem.
+- Incidente menor: o primeiro `docker run` falhou com "failed to connect to the docker API" porque o Docker Desktop não estava aberto (o CLI instalado não chega: o daemon tem de estar ativo).
+- Teste de persistência: livro adicionado no browser, container parado com Ctrl+C e relançado com o mesmo volume; o livro continuou lá.
+- CSRF no formulário de remover continua por tratar (aceitável em localhost; documentado no README).

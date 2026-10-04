@@ -1,3 +1,4 @@
+import os
 import re
 import sqlite3
 import unicodedata
@@ -7,7 +8,14 @@ from pathlib import Path
 # diretório de onde o programa foi lançado). Assim, a base de dados é sempre a
 # mesma, corra-se a GUI, o Flask ou os testes a partir de qualquer pasta.
 # Os testes substituem este valor por um ficheiro temporário (monkeypatch).
-DB_NAME = str(Path(__file__).resolve().parent / "biblioteca.db")
+#
+# A variável de ambiente BIBLIOTECA_DB permite apontar para outro ficheiro sem
+# mexer no código (usado no container Docker, onde a base de dados vive num
+# volume). Se não estiver definida, o comportamento é exatamente o de antes.
+DB_NAME = os.environ.get(
+    "BIBLIOTECA_DB",
+    str(Path(__file__).resolve().parent / "biblioteca.db"),
+)
 
 
 def normalize_text(texto: str | None) -> str:

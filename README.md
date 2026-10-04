@@ -26,6 +26,7 @@ This is a self-driven portfolio project built while transitioning into software 
 - **SQLite** — local storage, accessed through the standard library `sqlite3` module
 - **`urllib.request`** (standard library) — ISBN lookups, with no external HTTP dependency
 - **Flask** — optional web interface
+- **Docker** and **gunicorn** — containerized web interface with a persistent volume
 - **pytest**, **basedpyright** and **GitHub Actions** — automated tests, static type checking and continuous integration
 
 ## Getting started
@@ -68,6 +69,17 @@ python web/app.py
 
 Then open <http://127.0.0.1:5000>. This runs Flask's development server in debug mode, so it is meant for local use only — do not expose it to a network.
 
+### Web interface with Docker (optional)
+
+Requires Docker. The image runs the web interface under `gunicorn`, a production WSGI server, as a non-root user, and keeps the SQLite database in a Docker volume so your books survive container restarts.
+
+```bash
+docker build -t biblioteca-web .
+docker run --rm -p 8000:8000 -v biblioteca-data:/data biblioteca-web
+```
+
+Then open <http://localhost:8000>. The container uses its own database (the `biblioteca-data` volume, selected through the `BIBLIOTECA_DB` environment variable), separate from the `biblioteca.db` used by the desktop app. Note that the remove button has no CSRF protection, which is acceptable on localhost but should be added before exposing the app to a network.
+
 ### Tests
 
 ```bash
@@ -88,6 +100,8 @@ biblioteca-pessoal/
 │   ├── app.py
 │   └── templates/
 ├── tests/                # pytest suite
+├── Dockerfile            # container image for the web interface (gunicorn)
+├── .dockerignore         # keeps the database and secrets out of the image
 ├── .github/workflows/    # CI: tests + type checking
 ├── main.py               # original environment smoke test (not used by the GUI)
 ├── requirements.txt      # desktop app
@@ -114,7 +128,6 @@ ISBN is the sole duplicate-detection key (each edition of a book has its own ISB
 
 ## Roadmap
 
-- Containerize the web interface with Docker, using a production WSGI server instead of Flask's development server
 - Tests for the web routes, and for the ISBN lookup against recorded API responses
 
 ## License

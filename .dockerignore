@@ -1,0 +1,13 @@
+# Ficheiros que o "docker build" nunca deve enviar para dentro da imagem.
+# O mais importante: *.db (os teus livros) e .env (segredos) não podem ficar
+# embutidos numa imagem que possas vir a partilhar.
+.git
+.github
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+.env
+tests/
+docs/
