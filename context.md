@@ -21,9 +21,7 @@ Aplicação desktop em Python para catalogar livros pessoais (título, autor(es)
 ## Git
 
 - Branch única `main`, remoto `origin` → `https://github.com/Miguellopes-89/biblioteca-pessoal.git`
-- HEAD em 2026-10-03: `e1ef006` (em sincronia com `origin/main`)
-- **Por commitar:** README atualizado, `context.md` e `docs/historico.md` — sugerido: `git add README.md context.md docs/historico.md` e `Atualiza README e divide context.md em estado + histórico`
-- Confirmar com `git log --oneline -8` e `git status` antes de continuar
+- HEAD em 2026-10-04: `2b63700` "Atualiza README e divide context.md em estado + histórico" (em sincronia com `origin/main`; árvore limpa). Este ficheiro não regista o HEAD de cada commit: confirmar sempre com `git log --oneline -8` e `git status` antes de continuar
 - `.gitignore`: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `*.db`, `.pytest_cache/`
 
 ## Ficheiros
