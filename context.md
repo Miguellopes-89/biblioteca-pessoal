@@ -11,9 +11,9 @@ Aplicação desktop em Python para catalogar livros pessoais (título, autor(es)
 ## Ambiente
 
 - **SO:** Windows · **Python:** 3.14.6 · **Git:** 2.55.0 · **`gh`:** 2.96.0 (autenticado como `Miguellopes-89`) · **Editor:** Zed · **Docker:** Desktop 29.7.2 a funcionar (o daemon tem de estar ativo: abrir o Docker Desktop antes de qualquer `docker`); imagem `biblioteca-web`, volume `biblioteca-data`
-- **Caminho do projeto:** `C:\Users\User\OneDrive\Projetos\biblioteca-pessoal` (movido para o OneDrive para backup; `venv/` e `.git/` ficam lá, ver Próximo passo); venv: `.\venv\Scripts\Activate.ps1`. Sem ela ativa (prompt sem `(venv)`) o `pytest` não é reconhecido; `python -m pytest` é a forma segura
+- **Caminho do projeto:** `C:\Users\User\OneDrive\Projetos\biblioteca-pessoal` (localização definitiva de todos os projetos do Miguel; o `.git/` fica lá, a `venv` não); **venv fora do OneDrive** em `C:\Users\User\venvs\biblioteca-pessoal`, ativar com `C:\Users\User\venvs\biblioteca-pessoal\Scripts\Activate.ps1`. Sem ela ativa (prompt sem `(biblioteca-pessoal)`) o `pytest` não é reconhecido; `python -m pytest` é a forma segura
 - **Dependências:** `PySide6` 6.11.2 (`requirements.txt`) e `Flask` 3.1.3 (`requirements-web.txt`) separados deliberadamente; `requirements-dev.txt` com `pytest` 9.1.1 e `basedpyright`
-- **basedpyright:** 0 erros, 145 avisos (deixados por resolver de propósito). `pyrightconfig.json` com `"failOnWarnings": false`: só erros reprovam
+- **basedpyright:** 0 erros, 284 avisos (deixados por resolver de propósito; eram 145 antes de `tests/test_web.py`). `pyrightconfig.json` só com `"failOnWarnings": false` (sem `venvPath`/`venv`): só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI usa `--pythonpath venv/bin/python`
 - **Testes e CI:** `pytest` a partir da raiz, venv ativo; **56 testes: 55 passam e 1 `xfail` conhecido** (`tests/test_web.py` tem 17, rotas Flask com o test client). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright`; última execução verde
 - **Acesso de Claude ao PC:** Filesystem (`mcp__Filesystem__*`, restrito a `C:\Users\User\OneDrive`) ativo (nem sempre disponível: confirmar no início da sessão); **sem shell/PowerShell** — `git`, `pip`, `pytest`, `python web/app.py` corre-os o Miguel e cola o output
 - **Colar código no Zed:** causa mais comum de bugs (4 vezes) — confirmar visualmente a indentação de blocos `if`/`try` depois de colar
@@ -36,7 +36,7 @@ Aplicação desktop em Python para catalogar livros pessoais (título, autor(es)
 
 ## Próximo passo
 
-A escolher (fase web fechada; testes das rotas feitos). Pendente: (1) decidir onde fica a `venv` (dentro do OneDrive, como agora, ou fora; ver `docs/historico.md`); (2) bug conhecido em `update_book`: `None` significa "manter o valor atual", por isso esvaziar um campo opcional ao editar não o limpa (web e desktop), documentado em `test_edit_can_clear_optional_field` (`xfail`); a correção mexe numa função partilhada com a GUI; (3) CSRF no formulário de remover (mencionada no README; só necessária antes de expor a app a uma rede).
+A escolher (fase web fechada; testes das rotas feitos). Pendente: (1) Zed a usar "Python 3.13.14 (uv)" em vez da venv nova (erros falsos de import no editor: 1 erro e 151 avisos; linha de comandos e CI corretos); (2) bug conhecido em `update_book`: `None` significa "manter o valor atual", por isso esvaziar um campo opcional ao editar não o limpa (web e desktop), documentado em `test_edit_can_clear_optional_field` (`xfail`); a correção mexe numa função partilhada com a GUI; (3) CSRF no formulário de remover (mencionada no README; só necessária antes de expor a app a uma rede).
 
 Opções: (B) notebook de EDA com pandas sobre a própria biblioteca e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); testar o parsing de `_fetch_google_books`/`_fetch_open_library` com respostas de API simuladas (trocar `_pedir_json`); limpar os 24 avisos novos dos testes (ou modo estrito, zero avisos).
 
