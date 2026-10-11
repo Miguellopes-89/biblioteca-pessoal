@@ -29,8 +29,8 @@ jobs:
             requirements-web.txt
             requirements-dev.txt
 
-      # O ambiente chama-se "venv" para coincidir com o pyrightconfig.json
-      # (venvPath/venv), que é onde o basedpyright procura os pacotes.
+      # O ambiente chama-se "venv" e o basedpyright recebe o interpretador
+      # por --pythonpath (o pyrightconfig.json já não indica a venv).
       - name: Instalar dependências
         run: |
           python -m venv venv
@@ -43,4 +43,4 @@ jobs:
       # Falha só com ERROS de tipos. Os avisos aparecem no log mas não
       # reprovam o CI (decisão deliberada: exigir zero avisos fica para depois).
       - name: Verificar tipos (basedpyright)
-        run: venv/bin/basedpyright
+        run: venv/bin/basedpyright --pythonpath venv/bin/python
