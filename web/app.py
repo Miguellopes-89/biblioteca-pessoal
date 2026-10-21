@@ -22,8 +22,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from flask import Flask, redirect, render_template, request, url_for
 
-from database import add_book, create_tables, delete_book, get_book, list_books, search_books, update_book
+from database import (
+    InvalidISBNError, add_book, create_tables, delete_book, get_book, list_books, search_books, update_book,
+)
 from isbn_lookup import lookup_isbn, validar_isbn
+
+# Mensagem única para ISBN inválido ao gravar (adicionar e editar).
+ERRO_ISBN_INVALIDO = "Este ISBN não tem um dígito de controlo válido — corrige-o ou deixa o campo vazio."
 
 app = Flask(__name__)
 
@@ -99,10 +104,13 @@ def adicionar():
         if not titulo:
             return render_template("adicionar.html", erro="O título não pode ficar vazio.")
 
-        livro_id = add_book(
-            titulo=titulo, editora=editora, colecao=colecao, genero=genero,
-            isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
-        )
+        try:
+            livro_id = add_book(
+                titulo=titulo, editora=editora, colecao=colecao, genero=genero,
+                isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
+            )
+        except InvalidISBNError:
+            return render_template("adicionar.html", erro=ERRO_ISBN_INVALIDO)
         if livro_id is None:
             return render_template("adicionar.html", erro="Já existe um livro com este ISBN na biblioteca.")
 
@@ -138,10 +146,13 @@ def editar(livro_id: int):
         if not titulo:
             return render_template("editar.html", livro=livro, erro="O título não pode ficar vazio.")
 
-        sucesso = update_book(
-            livro_id, titulo=titulo, editora=editora, colecao=colecao,
-            genero=genero, isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
-        )
+        try:
+            sucesso = update_book(
+                livro_id, titulo=titulo, editora=editora, colecao=colecao,
+                genero=genero, isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
+            )
+        except InvalidISBNError:
+            return render_template("editar.html", livro=livro, erro=ERRO_ISBN_INVALIDO)
         if not sucesso:
             return render_template(
                 "editar.html", livro=livro,

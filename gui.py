@@ -7,7 +7,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,
 )
 
-from database import add_book, create_tables, list_books, update_book, delete_book, search_books
+from database import (
+    InvalidISBNError, add_book, create_tables, list_books, update_book, delete_book, search_books,
+)
 from isbn_lookup import lookup_isbn, validar_isbn, baixar_capa
 
 
@@ -270,26 +272,36 @@ class JanelaPrincipal(QMainWindow):
         autores_str = self.campo_autores.text().strip()
         estado_leitura = self.campo_estado_leitura.currentText()
 
-        if self.livro_selecionado_id is None:
-            # --- Modo adicionar ---
-            livro_id = add_book(
-                titulo=titulo, editora=editora, colecao=colecao, genero=genero,
-                isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
+        # add_book/update_book lançam InvalidISBNError se o ISBN não tiver um
+        # dígito de controlo válido; nesse caso nada é gravado e os campos
+        # ficam como estão, para o utilizador corrigir o ISBN (ou apagá-lo).
+        try:
+            if self.livro_selecionado_id is None:
+                # --- Modo adicionar ---
+                livro_id = add_book(
+                    titulo=titulo, editora=editora, colecao=colecao, genero=genero,
+                    isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
+                )
+                if livro_id is None:
+                    QMessageBox.warning(self, "ISBN duplicado", "Já existe um livro com este ISBN na biblioteca.")
+                    return
+                QMessageBox.information(self, "Sucesso", f"Livro adicionado (id {livro_id}).")
+            else:
+                # --- Modo edição ---
+                sucesso = update_book(
+                    self.livro_selecionado_id, titulo=titulo, editora=editora, colecao=colecao,
+                    genero=genero, isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
+                )
+                if not sucesso:
+                    QMessageBox.warning(self, "Erro ao atualizar", "Não foi possível atualizar (ISBN já usado por outro livro?).")
+                    return
+                QMessageBox.information(self, "Sucesso", "Livro atualizado.")
+        except InvalidISBNError:
+            QMessageBox.warning(
+                self, "ISBN inválido",
+                "Este ISBN não tem um dígito de controlo válido — corrige-o ou deixa o campo vazio.",
             )
-            if livro_id is None:
-                QMessageBox.warning(self, "ISBN duplicado", "Já existe um livro com este ISBN na biblioteca.")
-                return
-            QMessageBox.information(self, "Sucesso", f"Livro adicionado (id {livro_id}).")
-        else:
-            # --- Modo edição ---
-            sucesso = update_book(
-                self.livro_selecionado_id, titulo=titulo, editora=editora, colecao=colecao,
-                genero=genero, isbn=isbn, autores_str=autores_str, estado_leitura=estado_leitura,
-            )
-            if not sucesso:
-                QMessageBox.warning(self, "Erro ao atualizar", "Não foi possível atualizar (ISBN já usado por outro livro?).")
-                return
-            QMessageBox.information(self, "Sucesso", "Livro atualizado.")
+            return
 
         self.limpar_campos()
         self.atualizar_tabela()

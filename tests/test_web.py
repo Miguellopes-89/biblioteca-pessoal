@@ -269,3 +269,26 @@ def test_isbn_search_success_returns_metadata(client, monkeypatch):
     assert response.status_code == 200
     assert response.get_json() == fake_result
     assert calls == [VALID_ISBN]
+
+
+# --- validação do ISBN ao gravar --------------------------------------------
+
+def test_add_invalid_isbn_shows_error(client):
+    """ISBN com dígito de controlo errado: página com erro, nada gravado."""
+    response = _add(client, isbn="9780132350885")
+
+    assert response.status_code == 200  # volta a mostrar o formulário
+    assert "dígito de controlo válido" in response.get_data(as_text=True)
+    assert list_books() == []
+
+
+def test_edit_invalid_isbn_shows_error_and_keeps_old(client):
+    """Editar para um ISBN inválido: recusado, ISBN original mantém-se."""
+    _add(client, isbn="9780132350884")
+    livro_id = list_books()[0]["id"]
+
+    response = client.post(f"/livros/{livro_id}/editar", data=_form(isbn="123456789"))
+
+    assert response.status_code == 200
+    assert "dígito de controlo válido" in response.get_data(as_text=True)
+    assert list_books()[0]["isbn"] == "9780132350884"

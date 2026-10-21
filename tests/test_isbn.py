@@ -7,7 +7,7 @@ de controlo. Os inválidos são os mesmos números com UM algarismo alterado
 
 import pytest
 
-from isbn_lookup import validar_isbn
+from isbn_lookup import normalize_isbn, validar_isbn
 
 
 @pytest.mark.parametrize(
@@ -39,3 +39,16 @@ def test_valid_isbn(isbn: str) -> None:
 )
 def test_invalid_isbn(isbn: str) -> None:
     assert validar_isbn(isbn) is False
+
+
+@pytest.mark.parametrize(
+    ("bruto", "esperado"),
+    [
+        ("9780132350884", "9780132350884"),  # já na forma canónica
+        ("978-0-13-235088-4", "9780132350884"),  # hífenes removidos
+        (" 978 0 13 235088 4 ", "9780132350884"),  # espaços (dentro e fora) removidos
+        ("080442957x", "080442957X"),  # 'x' passa a maiúscula
+    ],
+)
+def test_normalize_isbn(bruto: str, esperado: str) -> None:
+    assert normalize_isbn(bruto) == esperado

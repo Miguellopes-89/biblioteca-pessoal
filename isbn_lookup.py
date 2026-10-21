@@ -124,6 +124,16 @@ def _fetch_open_library(isbn: str) -> dict[str, str] | None:
     }
 
 
+def normalize_isbn(isbn: str) -> str:
+    """Devolve o ISBN na forma canónica: sem hífenes nem espaços, 'x' em maiúscula.
+
+    Ex.: "978-0-13-235088-4" -> "9780132350884"; "0 306 40615 x" -> "030640615X".
+    É esta forma que se grava na base de dados, para que o mesmo ISBN escrito
+    com ou sem hífenes seja reconhecido como duplicado pela restrição UNIQUE.
+    """
+    return isbn.strip().replace("-", "").replace(" ", "").upper()
+
+
 def validar_isbn(isbn: str) -> bool:
     """Valida o dígito de controlo de um ISBN-10 ou ISBN-13.
 
@@ -135,7 +145,7 @@ def validar_isbn(isbn: str) -> bool:
     ISBN-10: soma ponderada (pesos 10 a 1) tem de ser múltiplo de 11;
     o dígito de controlo pode ser 'X', que vale 10.
     """
-    isbn = isbn.strip().replace("-", "").replace(" ", "").upper()
+    isbn = normalize_isbn(isbn)
 
     if len(isbn) == 13:
         if not isbn.isdigit():
@@ -171,7 +181,7 @@ def lookup_isbn(isbn: str) -> dict[str, str] | None:
     Nota: nenhuma das duas APIs expõe de forma fiável um campo
     "coleção" (série) — esse campo continua a ser preenchimento manual.
     """
-    isbn = isbn.strip().replace("-", "").replace(" ", "")
+    isbn = normalize_isbn(isbn)
     if not isbn:
         return None
 
