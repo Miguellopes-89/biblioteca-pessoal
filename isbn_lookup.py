@@ -87,10 +87,17 @@ def _fetch_google_books(isbn: str) -> dict[str, str] | None:
     """Consulta a Google Books API. Devolve dict normalizado ou None."""
     query = urllib.parse.urlencode({"q": f"isbn:{isbn}"})
     dados = _pedir_json(f"https://www.googleapis.com/books/v1/volumes?{query}")
-    if dados is None or dados.get("totalItems", 0) == 0:
+    if dados is None:
         return None
 
-    info = dados["items"][0].get("volumeInfo", {})
+    # Usa a lista "items" e não o número "totalItems": a Google Books às vezes
+    # indica totalItems > 0 sem enviar "items", e dados["items"] rebentava com
+    # KeyError antes de a cascata chegar à Open Library.
+    items = dados.get("items") or []
+    if not items:
+        return None
+
+    info = items[0].get("volumeInfo", {})
 
     return {
         "titulo": info.get("title", ""),
@@ -119,7 +126,7 @@ def _fetch_open_library(isbn: str) -> dict[str, str] | None:
         "titulo": info.get("title", ""),
         "autores_str": ", ".join(autores),
         "editora": ", ".join(editoras),
-        "genero": "",  # Open Library não expõe "subjects" de forma fiável neste endpoint
+        "genero": "",  # a Open Library devolve "subjects", mas são temas detalhados, não um género
         "capa_url": info.get("cover", {}).get("medium", ""),
     }
 
