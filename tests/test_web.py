@@ -183,17 +183,12 @@ def test_remove_missing_book_still_redirects(client):
     assert response.status_code == 302
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="update_book trata None como 'manter o valor atual', por isso um "
-    "campo esvaziado no formulário de editar não é limpo.",
-)
 def test_edit_can_clear_optional_field(client):
-    """Comportamento desejado: esvaziar a editora ao editar deixa-a vazia.
+    """Esvaziar a editora ao editar deixa-a vazia (NULL na base de dados).
 
-    xfail = "falha esperada": o teste fica no repositório a documentar um bug
-    conhecido sem fazer o pytest reprovar. Com strict=True, se o bug for
-    corrigido o teste passa e o pytest avisa (XPASS) para tirarmos a marca.
+    Foi um xfail até 2026-10-21: a rota convertia o campo vazio em None, que o
+    update_book lê como "manter o valor atual". Agora a rota envia "" e o
+    update_book grava NULL.
     """
     _add(client, editora="Editora Teste")
     livro_id = list_books()[0]["id"]

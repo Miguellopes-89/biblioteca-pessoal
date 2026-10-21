@@ -201,3 +201,52 @@ def test_delete_book_removes_links_but_keeps_author() -> None:
 
 def test_delete_book_missing_returns_false() -> None:
     assert database.delete_book(999) is False
+
+
+# ---------- campos vazios ("") ----------
+# A GUI envia "" (texto vazio) quando um campo fica em branco; a web enviava
+# None. database.py passa a tratar "" como "sem valor" e grava NULL, para que
+# as duas interfaces deixem a base de dados no mesmo estado.
+
+def _add_like_gui(titulo: str) -> int | None:
+    """Insere um livro com os campos opcionais vazios, tal como a GUI faz."""
+    return database.add_book(
+        titulo=titulo, editora="", colecao="", genero="", isbn="", autores_str="",
+    )
+
+
+def test_add_book_empty_strings_are_stored_as_null() -> None:
+    livro_id = _add_like_gui("Livro da GUI")
+    assert livro_id is not None
+
+    livro = database.get_book(livro_id)
+    assert livro is not None
+    for campo in ("editora", "colecao", "genero", "isbn"):
+        assert livro[campo] is None, campo
+
+
+def test_several_books_with_empty_isbn_from_gui_are_allowed() -> None:
+    # Antes da correção, o segundo livro era rejeitado como "ISBN duplicado":
+    # UNIQUE aceita vários NULL mas só um "".
+    assert _add_like_gui("Sem ISBN 1") is not None
+    assert _add_like_gui("Sem ISBN 2") is not None
+
+    assert len(database.list_books()) == 2
+
+
+def test_update_book_empty_string_clears_field() -> None:
+    livro_id = database.add_book(
+        titulo="Livro", editora="Editora", colecao="Coleção", genero="Romance",
+        isbn="9780132350884", autores_str="",
+    )
+    assert livro_id is not None
+
+    assert database.update_book(
+        livro_id, editora="", colecao="", genero="", isbn="",
+    ) is True
+
+    livro = database.get_book(livro_id)
+    assert livro is not None
+    for campo in ("editora", "colecao", "genero", "isbn"):
+        assert livro[campo] is None, campo
+    assert livro["titulo"] == "Livro"  # campo não passado (None) mantém-se
