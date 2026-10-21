@@ -38,6 +38,21 @@ def normalize_text(texto: str | None) -> str:
     return texto
 
 
+def _empty_to_none(valor: str | None) -> str | None:
+    """
+    Converte texto vazio (ou só espaços) em None, que o SQLite grava como NULL.
+
+    Porquê: a GUI envia "" quando um campo fica em branco. Gravar "" em vez de
+    NULL tem dois problemas: (1) a coluna isbn é UNIQUE, e o SQLite aceita
+    vários NULL mas só um "", por isso o segundo livro sem ISBN era rejeitado
+    como duplicado; (2) web e GUI deixavam a base de dados em estados diferentes
+    para o mesmo "campo vazio".
+    """
+    if valor is not None and not valor.strip():
+        return None
+    return valor
+
+
 def connect() -> sqlite3.Connection:
     """Abre ligação à base de dados e ativa verificação de chaves estrangeiras."""
     conn = sqlite3.connect(DB_NAME)
@@ -126,8 +141,13 @@ def add_book(
     """
     Insere um livro e associa-o aos seus autores.
     autores_str: nomes separados por vírgula, ex. "Fabcaro, Conrad"
+    Campos opcionais vazios ("") são gravados como NULL (ver _empty_to_none).
     """
     autores = [nome.strip() for nome in autores_str.split(",") if nome.strip()]
+    editora = _empty_to_none(editora)
+    colecao = _empty_to_none(colecao)
+    genero = _empty_to_none(genero)
+    isbn = _empty_to_none(isbn)
 
     conn = connect()
     cursor = conn.cursor()
@@ -283,8 +303,14 @@ def update_book(
 ) -> bool:
     """
     Atualiza os campos fornecidos de um livro existente, identificado por livro_id.
-    Campos não fornecidos (None) mantêm o valor atual — permite atualizações parciais,
-    ex. update_book(1, isbn="novo-isbn") só muda o ISBN.
+
+    Regra para cada campo opcional (editora, colecao, genero, isbn):
+      - None (ou não passado) -> mantém o valor atual (atualização parcial,
+        ex. update_book(1, isbn="novo-isbn") só muda o ISBN);
+      - ""  (texto vazio)     -> limpa o campo (grava NULL);
+      - outro texto           -> grava esse texto.
+    Os formulários (web e GUI) enviam sempre "" para um campo esvaziado, por
+    isso esvaziar um campo ao editar limpa-o de facto.
 
     Se autores_str for fornecido, substitui COMPLETAMENTE a lista de autores associados
     (mesmo formato do add_book: nomes separados por vírgula).
@@ -303,10 +329,11 @@ def update_book(
         return False
 
     novo_titulo = titulo if titulo is not None else livro_atual["titulo"]
-    novo_editora = editora if editora is not None else livro_atual["editora"]
-    novo_colecao = colecao if colecao is not None else livro_atual["colecao"]
-    novo_genero = genero if genero is not None else livro_atual["genero"]
-    novo_isbn = isbn if isbn is not None else livro_atual["isbn"]
+    # None = manter; "" = limpar (o _empty_to_none transforma-o em NULL)
+    novo_editora = _empty_to_none(editora) if editora is not None else livro_atual["editora"]
+    novo_colecao = _empty_to_none(colecao) if colecao is not None else livro_atual["colecao"]
+    novo_genero = _empty_to_none(genero) if genero is not None else livro_atual["genero"]
+    novo_isbn = _empty_to_none(isbn) if isbn is not None else livro_atual["isbn"]
     novo_estado_leitura = estado_leitura if estado_leitura is not None else livro_atual["estado_leitura"]
 
     try:

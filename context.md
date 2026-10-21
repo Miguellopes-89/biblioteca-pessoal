@@ -8,47 +8,73 @@ Aplicação desktop em Python para catalogar livros pessoais (título, autor(es)
 
 **Fase web concluída**: versão Flask (`web/`) que reutiliza `database.py` e `isbn_lookup.py` a par da app desktop (não a substitui). Corre localmente com `python web/app.py` (mesma BD da desktop) ou em container Docker com `gunicorn` (BD própria, num volume).
 
+## Como se trabalha (desde 2026-10-21)
+
+Há **três cópias** do projeto e o **GitHub é a única fonte de verdade** entre elas:
+
+1. **Claude Code (cloud):** clona o repositório, cria uma branch por tarefa, faz commit, push e abre o PR (pela API REST: `gh pr create` não funciona nas sessões cloud). Não integra na `main` sem confirmação do Miguel. Não tem acesso a nenhum dos PCs nem às BD reais.
+2. **PC novo** (onde o Miguel usa o Claude Code; PowerShell, sem Zed): serve para testar as branches do Claude (`git fetch` + `git switch <branch>`, pytest, GUI) e voltar à `main` no fim.
+3. **PC original** (OneDrive, Zed): onde estão os dados reais (`biblioteca.db`, 9 livros). Ao voltar a ele: `git switch main` + `git pull`.
+
+Regra: **começar cada sessão com `git pull` e acabar com tudo enviado para o GitHub**, em qualquer cópia; só uma cópia altera código de cada vez. A `venv` e a `biblioteca.db` não viajam pelo GitHub (de propósito): cada PC tem as suas, e a BD não se copia entre PCs.
+
+O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `CLAUDE.md` anexado pelo Miguel (não está versionado no repositório).
+
 ## Ambiente
 
-- **SO:** Windows · **Python:** 3.14.6 · **Git:** 2.55.0 · **`gh`:** 2.96.0 (autenticado como `Miguellopes-89`) · **Editor:** Zed · **Docker:** Desktop 29.7.2 a funcionar (o daemon tem de estar ativo: abrir o Docker Desktop antes de qualquer `docker`); imagem `biblioteca-web`, volume `biblioteca-data`
-- **Caminho do projeto:** `C:\Users\User\OneDrive\Projetos\biblioteca-pessoal` (localização definitiva de todos os projetos do Miguel; o `.git/` fica lá, a `venv` não); **venv fora do OneDrive** em `C:\Users\User\venvs\biblioteca-pessoal`, ativar com `C:\Users\User\venvs\biblioteca-pessoal\Scripts\Activate.ps1`. Sem ela ativa (prompt sem `(biblioteca-pessoal)`) o `pytest` não é reconhecido; `python -m pytest` é a forma segura. **Zed:** a venv não aparece sozinha no seletor (fica fora da pasta do projeto); foi adicionada com "Add Virtual Environment" (âmbito Project) e escolhida no seletor do canto inferior direito, que mostra "Python 3.14.6.final.0 (venv)"; contagem do Zed: 0 erros, 139 avisos
+- **PC original:** Windows · Python 3.14.6 · Git 2.55.0 · `gh` 2.96.0 (autenticado como `Miguellopes-89`) · Zed · Docker Desktop 29.7.2 (o daemon tem de estar ativo: abrir o Docker Desktop antes de qualquer `docker`); imagem `biblioteca-web`, volume `biblioteca-data`
+  - **Caminho:** `C:\Users\User\OneDrive\Projetos\biblioteca-pessoal` (localização definitiva de todos os projetos do Miguel; o `.git/` fica lá, a `venv` não). **Venv** em `C:\Users\User\venvs\biblioteca-pessoal`, ativar com `C:\Users\User\venvs\biblioteca-pessoal\Scripts\Activate.ps1`. Sem ela ativa o `pytest` não é reconhecido; `python -m pytest` é a forma segura. **Zed:** venv adicionada com "Add Virtual Environment" (âmbito Project); contagem do Zed: 0 erros, 139 avisos
+  - **Acesso de Claude:** Filesystem (`mcp__Filesystem__*`, restrito a `C:\Users\User\OneDrive`) nem sempre disponível; **sem shell** — `git`, `pip`, `pytest`, `python web/app.py` corre-os o Miguel e cola o output
+- **PC novo:** Windows · Python 3.14.8 (64 bits) · Git 2.56.0 · **sem** `winget`, Zed ou `gh` (não são precisos: só lê do GitHub)
+  - **Caminho:** `C:\Users\Utilizador\Desktop\biblioteca-pessoal` (clone). **Venv** em `C:\Users\Utilizador\venvs\biblioteca-pessoal`, usada sem ativar: `$py = "C:\Users\Utilizador\venvs\biblioteca-pessoal\Scripts\python.exe"` e depois `& $py -m pytest`, `& $py gui.py` (o `$py` perde-se ao fechar a janela). BD de testes própria (não são os dados reais)
+  - Usar a janela "Windows PowerShell" normal: nem "Administrator" nem "(x86)" (32 bits, incompatível com PySide6)
 - **Dependências:** `PySide6` 6.11.2 (`requirements.txt`) e `Flask` 3.1.3 (`requirements-web.txt`) separados deliberadamente; `requirements-dev.txt` com `pytest` 9.1.1 e `basedpyright`
-- **basedpyright:** 0 erros, 284 avisos (deixados por resolver de propósito; eram 145 antes de `tests/test_web.py`). `pyrightconfig.json` só com `"failOnWarnings": false` (sem `venvPath`/`venv`): só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI usa `--pythonpath venv/bin/python`
-- **Testes e CI:** `pytest` a partir da raiz, venv ativo; **56 testes: 55 passam e 1 `xfail` conhecido** (`tests/test_web.py` tem 17, rotas Flask com o test client). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright`; última execução verde
-- **Acesso de Claude ao PC:** Filesystem (`mcp__Filesystem__*`, restrito a `C:\Users\User\OneDrive`) ativo (nem sempre disponível: confirmar no início da sessão); **sem shell/PowerShell** — `git`, `pip`, `pytest`, `python web/app.py` corre-os o Miguel e cola o output
+- **basedpyright:** 0 erros, 283 avisos (deixados por resolver de propósito). `pyrightconfig.json` só com `"failOnWarnings": false`: só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI e o PC novo usam `--pythonpath <python da venv>`
+- **Testes e CI:** `pytest` a partir da raiz; **59 testes, todos passam, 0 `xfail`** (`tests/test_web.py` tem 17; `tests/test_database.py` tem 22). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde no PR #1
 - **Colar código no Zed:** causa mais comum de bugs (4 vezes) — confirmar visualmente a indentação de blocos `if`/`try` depois de colar
 
 ## Git
 
-- Branch única `main`, remoto `origin` → `https://github.com/Miguellopes-89/biblioteca-pessoal.git`
-- HEAD no fim da sessão de 2026-10-04: `b9631fa` "Containeriza a interface web com Docker e gunicorn" (enviado para `origin/main`; bloco Docker incluído). Este ficheiro não regista o HEAD de cada commit: confirmar sempre com `git log --oneline -8` e `git status` antes de continuar
+- Remoto `origin` → `https://github.com/Miguellopes-89/biblioteca-pessoal.git`. Uma branch por tarefa, integrada na `main` por PR
+- **Email dos commits:** `279319592+Miguellopes-89@users.noreply.github.com` (a conta bloqueia pushes com o email privado). Configurar uma vez em cada PC: `git config --global user.name "Miguel Lopes"` e `git config --global user.email "279319592+Miguellopes-89@users.noreply.github.com"`
+- Este ficheiro não regista o HEAD de cada commit: confirmar sempre com `git log --oneline -8` e `git status` antes de continuar
 - `.gitignore`: `venv/`, `__pycache__/`, `*.pyc`, `.env`, `*.db`, `.pytest_cache/`
 
 ## Ficheiros
 
-- Raiz: `gui.py` (PySide6), `database.py`, `isbn_lookup.py`, `main.py` (smoke test antigo, não usado), `README.md` (inglês), `LICENSE`, `pytest.ini`, `pyrightconfig.json`, `Dockerfile`, `.dockerignore`, `biblioteca.db` (não versionado, 9 livros)
+- Raiz: `gui.py` (PySide6), `database.py`, `isbn_lookup.py`, `main.py` (smoke test antigo, não usado), `README.md` (inglês), `LICENSE`, `pytest.ini`, `pyrightconfig.json`, `Dockerfile`, `.dockerignore`, `biblioteca.db` (não versionado; no PC original, 9 livros)
 - `database.py` expõe: `normalize_text`, `connect`, `create_tables`, `get_or_create_author`, `add_book`, `list_books`, `search_books`, `update_book`, `delete_book`, `get_book`. `DB_NAME` lê a variável de ambiente `BIBLIOTECA_DB` e, se não existir, usa o caminho absoluto de `biblioteca.db` junto ao ficheiro; listagens ordenadas sem acentos nem maiúsculas
-- Docker: `python:3.14-slim`, `gunicorn==26.2.0` instalado só na imagem (não está em `requirements-web.txt`), utilizador sem privilégios, `BIBLIOTECA_DB=/data/biblioteca.db`; o `create_tables()` corre no `CMD` antes do `gunicorn` (não passa pelo `__main__` do `app.py`). Comandos: `docker build -t biblioteca-web .` e `docker run --rm -p 8000:8000 -v biblioteca-data:/data biblioteca-web` (http://localhost:8000). Persistência confirmada no browser: o livro sobreviveu ao reinício do container. A BD do container é separada da da desktop; contém 1 "Livro de teste"
+- **Campos opcionais vazios** (editora, coleção, género, ISBN): `""` é gravado como `NULL` (função interna `_empty_to_none`). No `update_book`: `None` = manter o valor atual; `""` = limpar; outro texto = gravar. A GUI e a rota web de editar enviam `""` para um campo esvaziado
+- Docker: `python:3.14-slim`, `gunicorn==26.2.0` instalado só na imagem (não está em `requirements-web.txt`), utilizador sem privilégios, `BIBLIOTECA_DB=/data/biblioteca.db`; o `create_tables()` corre no `CMD` antes do `gunicorn`. Comandos: `docker build -t biblioteca-web .` e `docker run --rm -p 8000:8000 -v biblioteca-data:/data biblioteca-web` (http://localhost:8000). A BD do container é separada da da desktop; contém 1 "Livro de teste"
 - `tests/`: `conftest.py` (fixture `isolated_db`), `test_isbn.py`, `test_normalize.py`, `test_database.py`, `test_web.py` (fixtures `client` e `block_isbn_network`, esta autouse: faz rebentar qualquer chamada real ao lookup de ISBN)
 - `web/`: `app.py` + `templates/` (`index.html`, `adicionar.html`, `editar.html`)
-- Rotas web (todas testadas no browser): `GET /` (lista; `?q=` pesquisa), `GET/POST /adicionar`, `GET/POST /livros/<int:livro_id>/editar`, `POST /livros/<int:livro_id>/remover` (só POST), `GET /pesquisar-isbn?isbn=` (JSON; casos de erro confirmados; **caminho de sucesso nunca validado no browser** por causa do 429 da Google Books — arrumado por decisão do Miguel; a rota é agora testada com o lookup simulado, mas o parsing real de `_fetch_google_books`/`_fetch_open_library` continua sem teste de sucesso)
-- Flask com `debug=True` só ao correr `python web/app.py` (localhost); no container o `gunicorn` não executa esse bloco, por isso o debugger não fica ativo
+- Rotas web (todas testadas no browser): `GET /` (lista; `?q=` pesquisa), `GET/POST /adicionar`, `GET/POST /livros/<int:livro_id>/editar`, `POST /livros/<int:livro_id>/remover` (só POST), `GET /pesquisar-isbn?isbn=` (JSON; **caminho de sucesso nunca validado no browser** por causa do 429 da Google Books; o parsing real de `_fetch_google_books`/`_fetch_open_library` continua sem teste de sucesso)
+- Flask com `debug=True` só ao correr `python web/app.py` (localhost); no container o `gunicorn` não executa esse bloco
 
 ## Próximo passo
 
-A escolher (fase web fechada; testes das rotas feitos). Pendente: (1) bug conhecido em `update_book`: `None` significa "manter o valor atual", por isso esvaziar um campo opcional ao editar não o limpa (web e desktop), documentado em `test_edit_can_clear_optional_field` (`xfail`); a correção mexe numa função partilhada com a GUI; (2) CSRF no formulário de remover (mencionada no README; só necessária antes de expor a app a uma rede).
+1. **Integrar o PR #1** (correção de campos vazios + este ficheiro) depois da confirmação do Miguel. Depois, no PC original: `git config --global user.email ...` (ver Git), `git switch main`, `git pull`, e correr a consulta de verificação de `""` antigos (só leitura; em `docs/historico.md`, secção de 2026-10-21).
+2. A escolher: **validar o ISBN ao adicionar/guardar** (hoje a GUI aceita `123456789`; a validação do dígito de controlo só corre no botão "Procurar"; mexe em `gui.py` e `web/app.py`, ou em `database.py` para cobrir as duas); testar o parsing de `_fetch_google_books`/`_fetch_open_library` com respostas simuladas (trocar `_pedir_json`); (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito).
 
-Opções: (B) notebook de EDA com pandas sobre a própria biblioteca e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); testar o parsing de `_fetch_google_books`/`_fetch_open_library` com respostas de API simuladas (trocar `_pedir_json`); limpar os 24 avisos novos dos testes (ou modo estrito, zero avisos).
+Pendente: CSRF no formulário de remover (só necessária antes de expor a app a uma rede). Backlog secundário: confirmar visualmente uma capa (bloqueado pela falha das APIs); chave de API gratuita da Google Books se o lookup for retomado; decidir se o `CLAUDE.md` passa a ser versionado na raiz.
 
-Backlog secundário: confirmar visualmente uma capa (bloqueado pela falha das APIs); chave de API gratuita da Google Books se o lookup for retomado.
+## Última sessão (2026-10-21)
+
+- **Branch:** `fix/update-book-clear-fields` → PR #1 (CI verde).
+- **Mudou:** `database.py` grava `""` como `NULL` em `add_book`/`update_book`; no `update_book`, `""` limpa e `None` mantém. A rota web de editar envia `""`. Corrige: (a) web não limpava campos ao editar (era o `xfail`); (b) GUI recusava um segundo livro sem ISBN como "duplicado" (`UNIQUE` aceita vários `NULL`, só um `""`). O registo anterior de que o bug (a) afetava também a desktop estava errado.
+- **Testes:** 59 passed, 0 xfail (+3 testes novos); basedpyright 0 erros, 283 avisos.
+- **Verificado:** pytest e GUI no PC novo (limpar editora/ISBN e dois livros sem ISBN, OK); CI.
+- **Por verificar:** consulta de `""` antigos na `biblioteca.db` real (PC original); `gui.py` e Docker não foram tocados nem testados.
+- **Decisões:** opção 1 (normalizar na camada de dados) em vez de valor sentinela ou fim das atualizações parciais; sem migração dos dados antigos (limpam-se ao editar); novo fluxo de três cópias; email noreply nos commits.
 
 ## Regras de trabalho
 
 - PT-PT; código e nomes em inglês; README e descrição do GitHub em inglês. Miguel não é engenheiro informático: termos técnicos definidos na primeira menção.
 - Passos pequenos, código comentado, forma de testar. Não assumir factos sobre ferramentas: confirmar na prática.
 - Lint: correr a ferramenta no terminal e ler a lista completa antes de suspeitar. Rede: testar fora do Python (`Invoke-WebRequest`) antes de suspeitar do código.
+- Uma branch por tarefa, nunca commits diretos na `main`; integrar só depois de o Miguel confirmar.
 - Atualizar este ficheiro ao fechar um bloco coerente; incidentes e decisões novas vão para `docs/historico.md`. No fim da sessão, sugerir título em `kebab-case`.
 
 ## Título desta sessão
 
-`venv-fora-do-onedrive`
+`correcao-campos-vazios-e-segundo-pc`

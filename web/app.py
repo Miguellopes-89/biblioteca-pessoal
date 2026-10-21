@@ -127,10 +127,12 @@ def editar(livro_id: int):
     if request.method == "POST":
         titulo = request.form.get("titulo", "").strip()
         autores_str = request.form.get("autores_str", "").strip()
-        editora = request.form.get("editora", "").strip() or None
-        colecao = request.form.get("colecao", "").strip() or None
-        genero = request.form.get("genero", "").strip() or None
-        isbn = request.form.get("isbn", "").strip() or None
+        # Ao EDITAR, um campo vazio segue como "" (e não None): para o
+        # update_book, "" significa "limpar o campo" e None "manter o valor".
+        editora = request.form.get("editora", "").strip()
+        colecao = request.form.get("colecao", "").strip()
+        genero = request.form.get("genero", "").strip()
+        isbn = request.form.get("isbn", "").strip()
         estado_leitura = request.form.get("estado_leitura", "não lido")
 
         if not titulo:
