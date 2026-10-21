@@ -29,9 +29,9 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
   - **Caminho:** `C:\Users\Utilizador\Desktop\biblioteca-pessoal` (clone). **Venv** em `C:\Users\Utilizador\venvs\biblioteca-pessoal`, usada sem ativar: `$py = "C:\Users\Utilizador\venvs\biblioteca-pessoal\Scripts\python.exe"` e depois `& $py -m pytest`, `& $py gui.py` (o `$py` perde-se ao fechar a janela). BD de testes própria (não são os dados reais)
   - Usar a janela "Windows PowerShell" normal: nem "Administrator" nem "(x86)" (32 bits, incompatível com PySide6)
 - **Dependências:** `PySide6` 6.11.2 (`requirements.txt`) e `Flask` 3.1.3 (`requirements-web.txt`) separados deliberadamente; `requirements-dev.txt` com `pytest` 9.1.1 e `basedpyright`
-- **basedpyright:** 0 erros, 341 avisos (deixados por resolver de propósito). `pyrightconfig.json` só com `"failOnWarnings": false`: só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI e o PC novo usam `--pythonpath <python da venv>`
-- **Testes e CI:** `pytest` a partir da raiz; **89 testes, todos passam, 0 `xfail`** (`tests/test_database.py` tem 27; `tests/test_web.py` 20; `tests/test_isbn_fetch.py` 18; `tests/test_isbn.py` 17; `tests/test_normalize.py` 7). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde nos PR #1, #2 e #3
-- **Sessões cloud do Claude Code:** fazem push de branches novas, mas **não conseguem apagar branches remotas** (403 do proxy); isso faz-se no GitHub (Branches → caixote do lixo) ou com `git push origin --delete <branch>` num PC. **Sem acesso à Google Books nem à Open Library** (rede bloqueada): respostas reais só se obtêm num PC
+- **basedpyright:** 0 erros, 346 avisos (deixados por resolver de propósito). `pyrightconfig.json` só com `"failOnWarnings": false`: só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI e o PC novo usam `--pythonpath <python da venv>`
+- **Testes e CI:** `pytest` a partir da raiz; **97 testes, todos passam, 0 `xfail`** (`tests/test_database.py` tem 27; `tests/test_web.py` 20; `tests/test_isbn_fetch.py` 18; `tests/test_isbn.py` 17; `tests/test_normalize.py` 7; `tests/test_pedir_bytes.py` 8). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde nos PR #1, #2, #3 (integrados) e #4
+- **Sessões cloud do Claude Code:** fazem push de branches novas, mas **não conseguem apagar branches remotas** (403 do proxy); isso faz-se no GitHub (Branches → caixote do lixo) ou com `git push origin --delete <branch>` num PC. **Sem acesso à Google Books nem à Open Library** (rede bloqueada): respostas reais só se obtêm num PC. **O disco da sessão apaga-se ao fechar: push imediato depois de cada commit** (um commit sem push perdeu-se em 2026-10-21)
 - **Testar uma branch que já existe no PC:** `git switch <branch>` usa a cópia local, que pode estar desatualizada; fazer sempre `git pull` a seguir (aconteceu em 2026-10-21)
 - **Colar código no Zed:** causa mais comum de bugs (4 vezes) — confirmar visualmente a indentação de blocos `if`/`try` depois de colar
 
@@ -49,38 +49,39 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
 - **Campos opcionais vazios** (editora, coleção, género, ISBN): `""` é gravado como `NULL` (função interna `_empty_to_none`). No `update_book`: `None` = manter o valor atual; `""` = limpar; outro texto = gravar. A GUI e a rota web de editar enviam `""` para um campo esvaziado
 - **ISBN ao gravar** (desde 2026-10-21): `add_book`/`update_book` gravam-no na forma canónica (`isbn_lookup.normalize_isbn`: sem hífenes nem espaços, `X` maiúsculo) e **gravam-no mesmo com dígito de controlo inválido** (decisão do Miguel: assinalar, não recusar). A GUI mostra um aviso depois de gravar e pinta o ISBN a vermelho na tabela (com explicação ao passar o rato); a web pinta-o a vermelho e acrescenta "⚠ ISBN inválido" na lista, via `isbn_valido` registada no Jinja. Ambas cobrem também os livros antigos `update_book` com `isbn=None` mantém o valor antigo intacto
 - Docker: `python:3.14-slim`, `gunicorn==26.2.0` instalado só na imagem (não está em `requirements-web.txt`), utilizador sem privilégios, `BIBLIOTECA_DB=/data/biblioteca.db`; o `create_tables()` corre no `CMD` antes do `gunicorn`. Comandos: `docker build -t biblioteca-web .` e `docker run --rm -p 8000:8000 -v biblioteca-data:/data biblioteca-web` (http://localhost:8000). A BD do container é separada da da desktop; contém 1 "Livro de teste"
-- `tests/`: `conftest.py` (fixture `isolated_db`), `test_isbn.py`, `test_normalize.py`, `test_database.py`, `test_web.py` (fixtures `client` e `block_isbn_network`, esta autouse: faz rebentar qualquer chamada real ao lookup de ISBN), `test_isbn_fetch.py` (troca `_pedir_json` por respostas simuladas da Google Books e da Open Library; fixture autouse `no_network` faz rebentar qualquer pedido real)
+- `tests/`: `conftest.py` (fixture `isolated_db`), `test_isbn.py`, `test_normalize.py`, `test_database.py`, `test_web.py` (fixtures `client` e `block_isbn_network`, esta autouse: faz rebentar qualquer chamada real ao lookup de ISBN), `test_isbn_fetch.py` (troca `_pedir_json` por respostas simuladas da Google Books e da Open Library; fixture autouse `no_network` faz rebentar qualquer pedido real), `test_pedir_bytes.py` (retry de `_pedir_bytes`, com `urlopen` e `time.sleep` simulados; 4xx não é repetido, 5xx e falhas de rede são)
 - `web/`: `app.py` + `templates/` (`index.html`, `adicionar.html`, `editar.html`)
 - Rotas web (todas testadas no browser): `GET /` (lista; `?q=` pesquisa), `GET/POST /adicionar`, `GET/POST /livros/<int:livro_id>/editar`, `POST /livros/<int:livro_id>/remover` (só POST), `GET /pesquisar-isbn?isbn=` (JSON; caminho de sucesso nunca validado no browser por causa do 429 da Google Books; o parsing de `_fetch_google_books`/`_fetch_open_library` está testado com respostas simuladas, a da Open Library **confirmada contra a resposta real** em 2026-10-21; a da Google **ainda por confirmar**, porque a quota sem chave está a zero)
 - Flask com `debug=True` só ao correr `python web/app.py` (localhost); no container o `gunicorn` não executa esse bloco
 
 ## Próximo passo
 
-1. **PR #3** (`test/isbn-fetch-parsing`: testes de parsing + correção do `KeyError`): integrar depois da confirmação do Miguel. Só testes e uma alteração em `isbn_lookup.py`: não mexe na GUI nem na BD.
-2. **Google Books — decidir (a lacuna de teste da Google só fecha com isto):** a quota sem chave está a **zero** (não esgotada), por isso o 429 não passa com o tempo e a cascata cai sempre na Open Library, depois de 3 tentativas inúteis à Google. Opções: (a) chave de API gratuita da Google, lida de `.env`; (b) pôr a Open Library primeiro e a Google como recurso; (c) mínimo: não repetir pedidos que deram erro HTTP 4xx (corrige o atraso, não a Google). Detalhe em `docs/historico.md`.
-3. **PC original:** `git config --global user.email ...` (ver Git), `git switch main`, `git pull`; correr as duas consultas só de leitura em `docs/historico.md` (`""` antigos; ISBN inválidos ou com hífenes). Os ISBN inválidos já aparecem a vermelho na GUI e na web.
-4. **Apagar no GitHub** as branches integradas: `fix/update-book-clear-fields`, `feat/validate-isbn-on-save` (e `test/isbn-fetch-parsing` depois do merge).
-5. A escolher: (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito); usar os `subjects` da Open Library para sugerir o género (são temas detalhados, não um género: exige escolher um ou mapear).
+1. **PR da branch `fix/no-retry-on-http-4xx`** (opção c: erros HTTP 4xx deixam de ser repetidos; **PR #4**, CI verde). Teste manual num PC (`git fetch`, `git switch fix/no-retry-on-http-4xx`, `git pull`): `python -c "import time, isbn_lookup as i; t=time.time(); print(i.lookup_isbn('9780132350884')); print(round(time.time()-t,1), 's')"` deve devolver os dados da Open Library sem as ~2 s de pausas. Integrar depois da confirmação do Miguel. A Google continua sem quota; a chave de API (a) ou a ordem da cascata (b) ficam em aberto.
+2. **PC original:** `git config --global user.email ...` (ver Git), `git switch main`, `git pull`; correr as duas consultas só de leitura em `docs/historico.md` (`""` antigos; ISBN inválidos ou com hífenes). Os ISBN inválidos já aparecem a vermelho na GUI e na web.
+3. **Proteger a `main` no GitHub** (aviso "Your main branch isn't protected"): "Protect this branch" → exigir o CI verde, bloquear force push e eliminação; se ligar "require pull request", 0 aprovações. Feito pelo Miguel.
+4. **Apagar no GitHub** as branches integradas: `feat/validate-isbn-on-save`, `test/isbn-fetch-parsing` (e `fix/no-retry-on-http-4xx` depois do merge).
+5. **Acrescentar ao `CLAUDE.md`** (secção "COMO TRABALHAR"): "Nas sessões cloud, faz push imediato depois de cada commit: o disco da sessão apaga-se ao fechar." Feito pelo Miguel (o ficheiro não está versionado).
+6. A escolher: (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito); usar os `subjects` da Open Library para sugerir o género (são temas detalhados, não um género: exige escolher um ou mapear).
 
 Pendente: na web, o formulário de adicionar volta vazio quando há erro (o utilizador perde o que escreveu). CSRF no formulário de remover (só necessária antes de expor a app a uma rede). Hipótese por confirmar: `_pedir_bytes` só apanha `URLError` e `TimeoutError`; um reset de ligação a meio da leitura (`ConnectionResetError`) pode não ser apanhado. Backlog secundário: confirmar visualmente uma capa (a Open Library já devolve uma URL real: `https://covers.openlibrary.org/b/id/15126503-M.jpg`); o título da Google e da Open Library ignora o `subtitle`; decidir se o `CLAUDE.md` passa a ser versionado na raiz.
 
-## Última sessão (2026-10-21, noite)
+## Última sessão (2026-10-21, tarde)
 
-- **Branch:** `test/isbn-fetch-parsing` (PR #3, ainda aberto: commit novo acrescentado ao mesmo PR, por fechar a mesma tarefa).
-- **Respostas reais** obtidas pelo browser integrado da app Claude no PC (a cloud continua bloqueada): **Open Library confirmada** — chaves batem com o código; resposta simulada substituída por cópia encurtada da real. **Google: 429 com quota anónima a zero** (ver Próximo passo 2).
-- **Corrigido:** comentário em `isbn_lookup.py` que dizia que a Open Library não devolve `subjects` (devolve).
-- **Testes:** 89 passed; basedpyright 0 erros, 341 avisos (sem alteração).
-- **Por verificar:** forma real da resposta da Google (sem quota); CI do novo commit no PR #3; GUI e Docker não tocados.
-- **Decisões:** não usar os `subjects` como género nesta sessão (decisão de produto, fica no Próximo passo 5); não mexer no retry nem na ordem da cascata sem escolha do Miguel.
+- **Divergência à entrada:** a branch `fix/no-retry-on-http-4xx` da sessão anterior nunca chegou ao GitHub (commit sem push; o disco da cloud apagou-se). O GitHub estava em 89 testes e 341 avisos. Trabalho refeito.
+- **PR #3 integrado** (merge `9448bda`, CI verde, com autorização do Miguel). Branch `fix/no-retry-on-http-4xx` recriada a partir da `main` (commit `c168502`, **já com push**): 4xx sem retry; 5xx e falhas de rede como antes. 8 testes em `tests/test_pedir_bytes.py`; os 4 de 4xx falham com o código antigo.
+- **Testes:** 97 passed; basedpyright 0 erros, 346 avisos (+5, `reportPrivateUsage`).
+- **PR #4** aberto, CI verde.
+- **Por verificar:** teste manual do tempo de pesquisa num PC; forma real da resposta da Google; GUI e Docker não tocados.
+- **Decisões:** push imediato depois de cada commit nas sessões cloud (nova regra); o `context.md` desta sessão partiu da cópia do Miguel, não da do repositório (que estava atrasada).
 
 ## Regras de trabalho
 
 - PT-PT; código e nomes em inglês; README e descrição do GitHub em inglês. Miguel não é engenheiro informático: termos técnicos definidos na primeira menção.
 - Passos pequenos, código comentado, forma de testar. Não assumir factos sobre ferramentas: confirmar na prática.
 - Lint: correr a ferramenta no terminal e ler a lista completa antes de suspeitar. Rede: testar fora do Python (`Invoke-WebRequest`) antes de suspeitar do código.
-- Uma branch por tarefa, nunca commits diretos na `main`; integrar só depois de o Miguel confirmar.
+- Uma branch por tarefa, nunca commits diretos na `main`; integrar só depois de o Miguel confirmar. Nas sessões cloud, push logo a seguir a cada commit.
 - Atualizar este ficheiro ao fechar um bloco coerente; incidentes e decisões novas vão para `docs/historico.md`. No fim da sessão, sugerir título em `kebab-case`.
 
 ## Título desta sessão
 
-`respostas-reais-open-library-quota-google`
+`integrar-pr3-e-refazer-sem-retry-4xx`

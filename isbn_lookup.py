@@ -12,8 +12,8 @@ quem clonar o repositório não precisa de instalar mais nada.
 
 Mesmo com `urllib.request`, as ligações a hosts externos continuam a
 falhar de forma intermitente nesta máquina (reset de ligação, timeouts
-pontuais) — por isso `_pedir_json` repete cada pedido automaticamente
-antes de desistir.
+pontuais) — por isso `_pedir_bytes` repete cada pedido automaticamente
+antes de desistir (exceto erros HTTP 4xx, que não melhoram ao repetir).
 
 Este módulo não depende do PySide6 — pode ser testado isoladamente, sem
 abrir a GUI, por exemplo:
@@ -42,6 +42,12 @@ def _pedir_bytes(url: str) -> bytes | None:
     cabeçalho deste ficheiro: falhas de rede transitórias nesta máquina.
     Usada tanto para respostas JSON (_pedir_json) como para imagens
     de capa (baixar_capa) — evita duplicar a lógica de retry duas vezes.
+
+    Exceção: erros HTTP 4xx (400–499) NÃO são repetidos. Um 4xx significa
+    que o servidor respondeu e recusou o pedido (404 não encontrado, 429
+    quota esgotada, ...); repetir dá o mesmo resultado e só atrasa a
+    cascata para a Open Library. Erros 5xx (falha do servidor) e falhas de
+    rede continuam a ser repetidos, porque essas costumam ser passageiras.
     """
     pedido = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 
@@ -49,6 +55,14 @@ def _pedir_bytes(url: str) -> bytes | None:
         try:
             with urllib.request.urlopen(pedido, timeout=TIMEOUT_SEGUNDOS) as resposta:
                 return resposta.read()
+        except urllib.error.HTTPError as erro:
+            # HTTPError é uma subclasse de URLError, por isso tem de ser
+            # apanhada ANTES do bloco seguinte para poder ser tratada à parte.
+            if 400 <= erro.code < 500:
+                return None  # erro do pedido: desistir já, sem pausa
+            if tentativa == TENTATIVAS:
+                return None
+            time.sleep(PAUSA_ENTRE_TENTATIVAS_SEGUNDOS)
         except (urllib.error.URLError, TimeoutError):
             if tentativa == TENTATIVAS:
                 return None
