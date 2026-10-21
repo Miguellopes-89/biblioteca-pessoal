@@ -56,19 +56,29 @@ def open_library_response() -> dict[str, Any]:
     """Resposta típica de GET /api/books?bibkeys=ISBN:...&format=json&jscmd=data.
 
     A chave de topo é "ISBN:<isbn>", exatamente como foi pedida em bibkeys.
+    Copiada (e encurtada) da resposta real para este ISBN, obtida em 2026-10-21:
+    os nomes das chaves e a forma dos valores batem com a API verdadeira.
     """
     return {
         f"ISBN:{ISBN}": {
-            "url": "https://openlibrary.org/books/OL22109286M/Clean_code",
-            "key": "/books/OL22109286M",
-            "title": "Clean code",
-            "authors": [{"url": "https://openlibrary.org/authors/OL216228A", "name": "Robert C. Martin"}],
+            "url": "http://openlibrary.org/books/OL26222911M/Clean_Code",
+            "key": "/books/OL26222911M",
+            "title": "Clean Code",
+            "subtitle": "A Handbook of Agile Software Craftsmanship",
+            "authors": [{"url": "http://openlibrary.org/authors/OL2653686A/Robert_C._Martin", "name": "Robert C. Martin"}],
+            "number_of_pages": 431,
             "publishers": [{"name": "Prentice Hall"}],
-            "publish_date": "2009",
+            "publish_date": "July 2008",
+            # A resposta real traz "subjects" (temas detalhados, não um género);
+            # o código ignora-os de propósito, e o teste confirma que o género fica "".
+            "subjects": [
+                {"name": "Agile software development", "url": "https://openlibrary.org/subjects/agile_software_development"},
+                {"name": "Computer software", "url": "https://openlibrary.org/subjects/computer_software"},
+            ],
             "cover": {
-                "small": "https://covers.openlibrary.org/b/id/8234426-S.jpg",
-                "medium": "https://covers.openlibrary.org/b/id/8234426-M.jpg",
-                "large": "https://covers.openlibrary.org/b/id/8234426-L.jpg",
+                "small": "https://covers.openlibrary.org/b/id/15126503-S.jpg",
+                "medium": "https://covers.openlibrary.org/b/id/15126503-M.jpg",
+                "large": "https://covers.openlibrary.org/b/id/15126503-L.jpg",
             },
         }
     }
@@ -175,11 +185,11 @@ def test_open_library_parses_typical_response(monkeypatch: pytest.MonkeyPatch) -
     resultado = isbn_lookup._fetch_open_library(ISBN)
 
     assert resultado == {
-        "titulo": "Clean code",
+        "titulo": "Clean Code",
         "autores_str": "Robert C. Martin",
         "editora": "Prentice Hall",
-        "genero": "",  # o código não lê o género da Open Library
-        "capa_url": "https://covers.openlibrary.org/b/id/8234426-M.jpg",  # tamanho médio
+        "genero": "",  # o código não lê o género da Open Library (ignora "subjects")
+        "capa_url": "https://covers.openlibrary.org/b/id/15126503-M.jpg",  # tamanho médio
     }
     assert urls == [f"https://openlibrary.org/api/books?bibkeys=ISBN%3A{ISBN}&format=json&jscmd=data"]
 
@@ -258,7 +268,7 @@ def test_lookup_falls_back_when_google_omits_items(monkeypatch: pytest.MonkeyPat
     resultado = isbn_lookup.lookup_isbn(ISBN)
 
     assert resultado is not None
-    assert resultado["titulo"] == "Clean code"
+    assert resultado["titulo"] == "Clean Code"
 
 
 def test_lookup_both_fail_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -126,7 +126,7 @@ def _fetch_open_library(isbn: str) -> dict[str, str] | None:
         "titulo": info.get("title", ""),
         "autores_str": ", ".join(autores),
         "editora": ", ".join(editoras),
-        "genero": "",  # Open Library não expõe "subjects" de forma fiável neste endpoint
+        "genero": "",  # a Open Library devolve "subjects", mas são temas detalhados, não um género
         "capa_url": info.get("cover", {}).get("medium", ""),
     }
 
