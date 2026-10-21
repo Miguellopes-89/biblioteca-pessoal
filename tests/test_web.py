@@ -279,7 +279,9 @@ def test_add_invalid_isbn_is_saved_and_flagged_in_list(client):
 
     assert response.status_code == 302  # redirect para a lista, como num sucesso
     assert list_books()[0]["isbn"] == "9780132350885"
-    assert "ISBN inválido" in client.get("/").get_data(as_text=True)
+    pagina = client.get("/").get_data(as_text=True)
+    assert "ISBN inválido" in pagina
+    assert 'class="isbn-invalido"' in pagina  # texto a vermelho
 
 
 def test_edit_invalid_isbn_is_saved(client):
@@ -300,3 +302,4 @@ def test_valid_isbn_is_not_flagged_in_list(client):
     pagina = client.get("/").get_data(as_text=True)
     assert "9780132350884" in pagina  # gravado na forma canónica
     assert "ISBN inválido" not in pagina
+    assert 'class="isbn-invalido"' not in pagina

@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtCore import QThread, Signal, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFormLayout,
     QLineEdit, QPushButton, QMessageBox, QComboBox, QLabel,
@@ -9,6 +9,10 @@ from PySide6.QtWidgets import (
 
 from database import add_book, create_tables, list_books, update_book, delete_book, search_books
 from isbn_lookup import lookup_isbn, validar_isbn, baixar_capa
+
+# Cor do texto de um ISBN com dígito de controlo inválido na tabela: lembrete
+# visual de que tem de ser corrigido. Vermelho escuro, legível em fundo branco.
+COR_ISBN_INVALIDO = QColor("#c62828")
 
 
 class PesquisaISBNThread(QThread):
@@ -360,8 +364,20 @@ class JanelaPrincipal(QMainWindow):
             self.tabela_livros.setItem(linha, 3, QTableWidgetItem(livro["editora"] or ""))
             self.tabela_livros.setItem(linha, 4, QTableWidgetItem(livro["colecao"] or ""))
             self.tabela_livros.setItem(linha, 5, QTableWidgetItem(livro["genero"] or ""))
-            self.tabela_livros.setItem(linha, 6, QTableWidgetItem(livro["isbn"] or ""))
+            self.tabela_livros.setItem(linha, 6, self._celula_isbn(livro["isbn"]))
             self.tabela_livros.setItem(linha, 7, QTableWidgetItem(livro["estado_leitura"]))
+
+    @staticmethod
+    def _celula_isbn(isbn: str | None) -> QTableWidgetItem:
+        """Célula da coluna ISBN: texto a vermelho (com explicação ao passar o
+        rato) se o dígito de controlo for inválido. O livro foi gravado na
+        mesma (decisão: assinalar, não recusar); a cor é o lembrete para o
+        corrigir quando houver oportunidade."""
+        celula = QTableWidgetItem(isbn or "")
+        if isbn and not validar_isbn(isbn):
+            celula.setForeground(COR_ISBN_INVALIDO)
+            celula.setToolTip("ISBN inválido: o dígito de controlo não bate certo. Confirma se não há algarismos trocados.")
+        return celula
 
 
 if __name__ == "__main__":
