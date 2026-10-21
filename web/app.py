@@ -27,6 +27,11 @@ from isbn_lookup import lookup_isbn, validar_isbn
 
 app = Flask(__name__)
 
+# Torna validar_isbn chamável dentro dos templates (Jinja), como isbn_valido(...).
+# A lista usa-a para marcar livros com ISBN de dígito de controlo inválido:
+# esses livros são gravados na mesma (decisão: assinalar, não recusar).
+app.add_template_global(validar_isbn, name="isbn_valido")
+
 
 @app.route("/")
 def index():

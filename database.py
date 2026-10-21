@@ -4,6 +4,11 @@ import sqlite3
 import unicodedata
 from pathlib import Path
 
+# isbn_lookup só usa a standard library, e importar o módulo não faz pedidos
+# de rede (só as funções de lookup os fazem). Usamos daqui apenas a função
+# pura normalize_isbn, para haver uma única forma canónica no projeto.
+from isbn_lookup import normalize_isbn
+
 # Caminho absoluto, calculado a partir da localização DESTE ficheiro (e não do
 # diretório de onde o programa foi lançado). Assim, a base de dados é sempre a
 # mesma, corra-se a GUI, o Flask ou os testes a partir de qualquer pasta.
@@ -51,6 +56,21 @@ def _empty_to_none(valor: str | None) -> str | None:
     if valor is not None and not valor.strip():
         return None
     return valor
+
+
+def _clean_isbn(isbn: str | None) -> str | None:
+    """Prepara o ISBN para gravar: vazio -> None; caso contrário devolve-o
+    na forma canónica (sem hífenes nem espaços, 'X' maiúsculo).
+
+    NÃO recusa ISBN com dígito de controlo inválido (decisão do Miguel:
+    assinalar, não recusar). Há livros com ISBN impresso errado, e o
+    catálogo deve aceitar o que está no livro. Quem assinala é a interface
+    (GUI: aviso depois de gravar; web: marca na lista), com validar_isbn.
+    """
+    isbn = _empty_to_none(isbn)
+    if isbn is None:
+        return None
+    return normalize_isbn(isbn)
 
 
 def connect() -> sqlite3.Connection:
@@ -142,12 +162,14 @@ def add_book(
     Insere um livro e associa-o aos seus autores.
     autores_str: nomes separados por vírgula, ex. "Fabcaro, Conrad"
     Campos opcionais vazios ("") são gravados como NULL (ver _empty_to_none).
+    O ISBN é gravado sem hífenes nem espaços (ver _clean_isbn); um ISBN
+    com dígito de controlo inválido é gravado na mesma.
     """
     autores = [nome.strip() for nome in autores_str.split(",") if nome.strip()]
     editora = _empty_to_none(editora)
     colecao = _empty_to_none(colecao)
     genero = _empty_to_none(genero)
-    isbn = _empty_to_none(isbn)
+    isbn = _clean_isbn(isbn)
 
     conn = connect()
     cursor = conn.cursor()
@@ -316,7 +338,11 @@ def update_book(
     (mesmo formato do add_book: nomes separados por vírgula).
 
     Devolve True se o livro foi encontrado e atualizado, False caso contrário.
+    O isbn fornecido é gravado na forma canónica (ver _clean_isbn).
     """
+    # isbn=None (manter) não é tocado — o valor antigo continua como está.
+    isbn_limpo = _clean_isbn(isbn) if isbn is not None else None
+
     conn = connect()
     cursor = conn.cursor()
 
@@ -333,7 +359,7 @@ def update_book(
     novo_editora = _empty_to_none(editora) if editora is not None else livro_atual["editora"]
     novo_colecao = _empty_to_none(colecao) if colecao is not None else livro_atual["colecao"]
     novo_genero = _empty_to_none(genero) if genero is not None else livro_atual["genero"]
-    novo_isbn = _empty_to_none(isbn) if isbn is not None else livro_atual["isbn"]
+    novo_isbn = isbn_limpo if isbn is not None else livro_atual["isbn"]
     novo_estado_leitura = estado_leitura if estado_leitura is not None else livro_atual["estado_leitura"]
 
     try:

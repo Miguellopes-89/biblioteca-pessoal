@@ -269,3 +269,37 @@ def test_isbn_search_success_returns_metadata(client, monkeypatch):
     assert response.status_code == 200
     assert response.get_json() == fake_result
     assert calls == [VALID_ISBN]
+
+
+# --- ISBN inválido: assinalado, não recusado --------------------------------
+
+def test_add_invalid_isbn_is_saved_and_flagged_in_list(client):
+    """ISBN com dígito de controlo errado: gravado, e a lista mostra o aviso."""
+    response = _add(client, isbn="9780132350885")
+
+    assert response.status_code == 302  # redirect para a lista, como num sucesso
+    assert list_books()[0]["isbn"] == "9780132350885"
+    pagina = client.get("/").get_data(as_text=True)
+    assert "ISBN inválido" in pagina
+    assert 'class="isbn-invalido"' in pagina  # texto a vermelho
+
+
+def test_edit_invalid_isbn_is_saved(client):
+    """Editar para um ISBN inválido: gravado na mesma."""
+    _add(client, isbn="9780132350884")
+    livro_id = list_books()[0]["id"]
+
+    response = client.post(f"/livros/{livro_id}/editar", data=_form(isbn="123456789"))
+
+    assert response.status_code == 302
+    assert list_books()[0]["isbn"] == "123456789"
+
+
+def test_valid_isbn_is_not_flagged_in_list(client):
+    """Um ISBN válido não leva aviso na lista."""
+    _add(client, isbn="978-0-13-235088-4")
+
+    pagina = client.get("/").get_data(as_text=True)
+    assert "9780132350884" in pagina  # gravado na forma canónica
+    assert "ISBN inválido" not in pagina
+    assert 'class="isbn-invalido"' not in pagina
