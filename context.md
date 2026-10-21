@@ -64,11 +64,11 @@ Pendente: na web, o formulário de adicionar volta vazio quando há erro (o util
 ## Última sessão (2026-10-21)
 
 - **Início:** o PR #1 já tinha sido integrado na `main` (merge `36c0f2a`), ao contrário do que este ficheiro dizia.
-- **Branch:** `feat/validate-isbn-on-save` → PR #2 (CI por confirmar).
+- **Branch:** `feat/validate-isbn-on-save` → PR #2 (CI verde).
 - **Mudou:** ISBN normalizado (`normalize_isbn`) e validado em `add_book`/`update_book`, que lançam `InvalidISBNError`; GUI e web mostram "ISBN inválido". O mesmo ISBN com e sem hífenes passa a ser detetado como duplicado.
 - **Testes:** 70 passed (+11); basedpyright 0 erros, 300 avisos (+17, do tipo já existente).
 - **Verificado:** pytest e basedpyright na cloud (Python 3.13, não 3.14); GUI só em modo `offscreen`.
-- **Por verificar:** GUI no ecrã; CI do PR #2; ISBN antigos na `biblioteca.db` real; Docker não tocado.
+- **Por verificar:** GUI no ecrã; ISBN antigos na `biblioteca.db` real; Docker não tocado.
 - **Decisões:** validação na camada de dados com exceção própria; forma canónica sem hífenes; `isbn=None` não valida o valor antigo. A branch `fix/update-book-clear-fields` ficou por apagar (bloqueado na cloud).
 
 ## Regras de trabalho
