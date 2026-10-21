@@ -30,7 +30,7 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
   - Usar a janela "Windows PowerShell" normal: nem "Administrator" nem "(x86)" (32 bits, incompatível com PySide6)
 - **Dependências:** `PySide6` 6.11.2 (`requirements.txt`) e `Flask` 3.1.3 (`requirements-web.txt`) separados deliberadamente; `requirements-dev.txt` com `pytest` 9.1.1 e `basedpyright`
 - **basedpyright:** 0 erros, 346 avisos (deixados por resolver de propósito). `pyrightconfig.json` só com `"failOnWarnings": false`: só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI e o PC novo usam `--pythonpath <python da venv>`
-- **Testes e CI:** `pytest` a partir da raiz; **97 testes, todos passam, 0 `xfail`** (`tests/test_database.py` tem 27; `tests/test_web.py` 20; `tests/test_isbn_fetch.py` 18; `tests/test_isbn.py` 17; `tests/test_normalize.py` 7; `tests/test_pedir_bytes.py` 8). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde nos PR #1, #2 e #3 (todos integrados)
+- **Testes e CI:** `pytest` a partir da raiz; **97 testes, todos passam, 0 `xfail`** (`tests/test_database.py` tem 27; `tests/test_web.py` 20; `tests/test_isbn_fetch.py` 18; `tests/test_isbn.py` 17; `tests/test_normalize.py` 7; `tests/test_pedir_bytes.py` 8). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde nos PR #1, #2, #3 (integrados) e #4
 - **Sessões cloud do Claude Code:** fazem push de branches novas, mas **não conseguem apagar branches remotas** (403 do proxy); isso faz-se no GitHub (Branches → caixote do lixo) ou com `git push origin --delete <branch>` num PC. **Sem acesso à Google Books nem à Open Library** (rede bloqueada): respostas reais só se obtêm num PC. **O disco da sessão apaga-se ao fechar: push imediato depois de cada commit** (um commit sem push perdeu-se em 2026-10-21)
 - **Testar uma branch que já existe no PC:** `git switch <branch>` usa a cópia local, que pode estar desatualizada; fazer sempre `git pull` a seguir (aconteceu em 2026-10-21)
 - **Colar código no Zed:** causa mais comum de bugs (4 vezes) — confirmar visualmente a indentação de blocos `if`/`try` depois de colar
@@ -56,7 +56,7 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
 
 ## Próximo passo
 
-1. **PR da branch `fix/no-retry-on-http-4xx`** (opção c: erros HTTP 4xx deixam de ser repetidos; já no GitHub, PR por abrir — pedir autorização). Depois de o CI ficar verde, teste manual num PC (`git fetch`, `git switch fix/no-retry-on-http-4xx`, `git pull`): `python -c "import time, isbn_lookup as i; t=time.time(); print(i.lookup_isbn('9780132350884')); print(round(time.time()-t,1), 's')"` deve devolver os dados da Open Library sem as ~2 s de pausas. Integrar depois da confirmação do Miguel. A Google continua sem quota; a chave de API (a) ou a ordem da cascata (b) ficam em aberto.
+1. **PR da branch `fix/no-retry-on-http-4xx`** (opção c: erros HTTP 4xx deixam de ser repetidos; **PR #4**, CI verde). Teste manual num PC (`git fetch`, `git switch fix/no-retry-on-http-4xx`, `git pull`): `python -c "import time, isbn_lookup as i; t=time.time(); print(i.lookup_isbn('9780132350884')); print(round(time.time()-t,1), 's')"` deve devolver os dados da Open Library sem as ~2 s de pausas. Integrar depois da confirmação do Miguel. A Google continua sem quota; a chave de API (a) ou a ordem da cascata (b) ficam em aberto.
 2. **PC original:** `git config --global user.email ...` (ver Git), `git switch main`, `git pull`; correr as duas consultas só de leitura em `docs/historico.md` (`""` antigos; ISBN inválidos ou com hífenes). Os ISBN inválidos já aparecem a vermelho na GUI e na web.
 3. **Proteger a `main` no GitHub** (aviso "Your main branch isn't protected"): "Protect this branch" → exigir o CI verde, bloquear force push e eliminação; se ligar "require pull request", 0 aprovações. Feito pelo Miguel.
 4. **Apagar no GitHub** as branches integradas: `feat/validate-isbn-on-save`, `test/isbn-fetch-parsing` (e `fix/no-retry-on-http-4xx` depois do merge).
@@ -70,7 +70,8 @@ Pendente: na web, o formulário de adicionar volta vazio quando há erro (o util
 - **Divergência à entrada:** a branch `fix/no-retry-on-http-4xx` da sessão anterior nunca chegou ao GitHub (commit sem push; o disco da cloud apagou-se). O GitHub estava em 89 testes e 341 avisos. Trabalho refeito.
 - **PR #3 integrado** (merge `9448bda`, CI verde, com autorização do Miguel). Branch `fix/no-retry-on-http-4xx` recriada a partir da `main` (commit `c168502`, **já com push**): 4xx sem retry; 5xx e falhas de rede como antes. 8 testes em `tests/test_pedir_bytes.py`; os 4 de 4xx falham com o código antigo.
 - **Testes:** 97 passed; basedpyright 0 erros, 346 avisos (+5, `reportPrivateUsage`).
-- **Por verificar:** CI da branch (PR por abrir); teste manual do tempo de pesquisa num PC; forma real da resposta da Google; GUI e Docker não tocados.
+- **PR #4** aberto, CI verde.
+- **Por verificar:** teste manual do tempo de pesquisa num PC; forma real da resposta da Google; GUI e Docker não tocados.
 - **Decisões:** push imediato depois de cada commit nas sessões cloud (nova regra); o `context.md` desta sessão partiu da cópia do Miguel, não da do repositório (que estava atrasada).
 
 ## Regras de trabalho
