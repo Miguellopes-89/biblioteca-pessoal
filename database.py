@@ -5,9 +5,9 @@ import unicodedata
 from pathlib import Path
 
 # isbn_lookup só usa a standard library, e importar o módulo não faz pedidos
-# de rede (só as funções de lookup os fazem). Usamos daqui apenas as duas
-# funções puras de ISBN, para haver uma única regra de validação no projeto.
-from isbn_lookup import normalize_isbn, validar_isbn
+# de rede (só as funções de lookup os fazem). Usamos daqui apenas a função
+# pura normalize_isbn, para haver uma única forma canónica no projeto.
+from isbn_lookup import normalize_isbn
 
 # Caminho absoluto, calculado a partir da localização DESTE ficheiro (e não do
 # diretório de onde o programa foi lançado). Assim, a base de dados é sempre a
@@ -58,28 +58,19 @@ def _empty_to_none(valor: str | None) -> str | None:
     return valor
 
 
-class InvalidISBNError(ValueError):
-    """Lançada por add_book/update_book quando o ISBN não tem um dígito de
-    controlo válido. É uma exceção (e não um return None/False) para quem
-    chama distinguir este caso do "ISBN duplicado" e mostrar a mensagem certa.
-    """
-
-
 def _clean_isbn(isbn: str | None) -> str | None:
-    """Prepara o ISBN para gravar: vazio -> None; caso contrário normaliza
-    (sem hífenes nem espaços) e valida o dígito de controlo.
+    """Prepara o ISBN para gravar: vazio -> None; caso contrário devolve-o
+    na forma canónica (sem hífenes nem espaços, 'X' maiúsculo).
 
-    Lança InvalidISBNError se o ISBN não for válido. A validação vive aqui
-    (e não na GUI ou no Flask) para proteger as duas interfaces de uma vez.
+    NÃO recusa ISBN com dígito de controlo inválido (decisão do Miguel:
+    assinalar, não recusar). Há livros com ISBN impresso errado, e o
+    catálogo deve aceitar o que está no livro. Quem assinala é a interface
+    (GUI: aviso depois de gravar; web: marca na lista), com validar_isbn.
     """
     isbn = _empty_to_none(isbn)
     if isbn is None:
         return None
-
-    isbn = normalize_isbn(isbn)
-    if not validar_isbn(isbn):
-        raise InvalidISBNError(f"ISBN inválido: '{isbn}'")
-    return isbn
+    return normalize_isbn(isbn)
 
 
 def connect() -> sqlite3.Connection:
@@ -171,14 +162,14 @@ def add_book(
     Insere um livro e associa-o aos seus autores.
     autores_str: nomes separados por vírgula, ex. "Fabcaro, Conrad"
     Campos opcionais vazios ("") são gravados como NULL (ver _empty_to_none).
-    O ISBN é gravado sem hífenes nem espaços; se for inválido, lança
-    InvalidISBNError antes de tocar na base de dados.
+    O ISBN é gravado sem hífenes nem espaços (ver _clean_isbn); um ISBN
+    com dígito de controlo inválido é gravado na mesma.
     """
     autores = [nome.strip() for nome in autores_str.split(",") if nome.strip()]
     editora = _empty_to_none(editora)
     colecao = _empty_to_none(colecao)
     genero = _empty_to_none(genero)
-    isbn = _clean_isbn(isbn)  # pode lançar InvalidISBNError
+    isbn = _clean_isbn(isbn)
 
     conn = connect()
     cursor = conn.cursor()
@@ -347,10 +338,9 @@ def update_book(
     (mesmo formato do add_book: nomes separados por vírgula).
 
     Devolve True se o livro foi encontrado e atualizado, False caso contrário.
-    Se o isbn fornecido for inválido, lança InvalidISBNError sem alterar nada.
+    O isbn fornecido é gravado na forma canónica (ver _clean_isbn).
     """
-    # Valida ANTES de abrir a ligação: se rebentar, não fica nada a meio.
-    # isbn=None (manter) não é validado — o valor antigo continua como está.
+    # isbn=None (manter) não é tocado — o valor antigo continua como está.
     isbn_limpo = _clean_isbn(isbn) if isbn is not None else None
 
     conn = connect()

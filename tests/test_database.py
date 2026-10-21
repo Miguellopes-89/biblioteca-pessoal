@@ -3,8 +3,6 @@
 Cada teste corre sobre uma base de dados temporária vazia (ver conftest.py).
 """
 
-import pytest
-
 import database
 
 
@@ -255,17 +253,15 @@ def test_update_book_empty_string_clears_field() -> None:
 
 
 # ---------- validação do ISBN ao gravar ----------
-# Antes, a validação do dígito de controlo só corria no botão "Procurar":
-# era possível gravar "123456789". Agora add_book/update_book recusam-no.
+# Decisão: um ISBN com dígito de controlo inválido é ASSINALADO pela interface
+# (GUI e web), não recusado. A camada de dados só o normaliza e grava.
 
-def test_add_book_invalid_isbn_raises_and_saves_nothing() -> None:
-    with pytest.raises(database.InvalidISBNError):
-        database.add_book(
-            titulo="Livro", editora=None, colecao=None, genero=None,
-            isbn="9780132350885", autores_str="Autor",  # último algarismo trocado
-        )
+def test_add_book_invalid_isbn_is_saved_normalized() -> None:
+    livro_id = add("Livro", isbn="978-0-13-235088-5")  # último algarismo trocado
 
-    assert database.list_books() == []  # nem o livro nem nada a meio
+    livro = database.get_book(livro_id)
+    assert livro is not None
+    assert livro["isbn"] == "9780132350885"  # gravado na mesma, sem hífenes
 
 
 def test_add_book_stores_isbn_without_hyphens() -> None:
@@ -286,21 +282,20 @@ def test_same_isbn_with_hyphens_is_detected_as_duplicate() -> None:
     ) is None
 
 
-def test_update_book_invalid_isbn_raises_and_keeps_old_value() -> None:
+def test_update_book_invalid_isbn_is_saved() -> None:
     livro_id = add("Livro", isbn="9780132350884")
 
-    with pytest.raises(database.InvalidISBNError):
-        database.update_book(livro_id, titulo="Novo título", isbn="123456789")
+    assert database.update_book(livro_id, titulo="Novo título", isbn="123456789") is True
 
     livro = database.get_book(livro_id)
     assert livro is not None
-    assert livro["isbn"] == "9780132350884"
-    assert livro["titulo"] == "Livro"  # nada foi alterado
+    assert livro["isbn"] == "123456789"
+    assert livro["titulo"] == "Novo título"
 
 
-def test_update_book_without_isbn_does_not_validate_old_value() -> None:
-    # Livros antigos podem ter um ISBN inválido gravado antes desta regra.
-    # Editar outros campos (isbn=None = manter) não deve rebentar por causa dele.
+def test_update_book_without_isbn_keeps_old_value_untouched() -> None:
+    # Livros antigos podem ter um ISBN gravado com hífenes ou inválido.
+    # Editar outros campos (isbn=None = manter) não o deve alterar.
     conn = database.connect()
     cursor = conn.execute("INSERT INTO livros (titulo, isbn) VALUES ('Antigo', '123456789')")
     livro_id = cursor.lastrowid

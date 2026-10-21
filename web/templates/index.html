@@ -8,6 +8,7 @@
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
         th { background-color: #f0f0f0; }
+        .aviso { color: #a15c00; font-size: 0.85em; white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -48,7 +49,13 @@
                 <td>{{ livro.editora or "" }}</td>
                 <td>{{ livro.colecao or "" }}</td>
                 <td>{{ livro.genero or "" }}</td>
-                <td>{{ livro.isbn or "" }}</td>
+                <td>
+                    {{ livro.isbn or "" }}
+                    {# Assinala (sem recusar) um ISBN com dígito de controlo inválido #}
+                    {% if livro.isbn and not isbn_valido(livro.isbn) %}
+                        <span class="aviso" title="O dígito de controlo não bate certo: confirma se não há algarismos trocados.">⚠ ISBN inválido</span>
+                    {% endif %}
+                </td>
                 <td>{{ livro.estado_leitura }}</td>
                 <td>
                     <a href="{{ url_for('editar', livro_id=livro.id) }}">Editar</a>

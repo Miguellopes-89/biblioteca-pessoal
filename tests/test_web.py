@@ -271,24 +271,32 @@ def test_isbn_search_success_returns_metadata(client, monkeypatch):
     assert calls == [VALID_ISBN]
 
 
-# --- validação do ISBN ao gravar --------------------------------------------
+# --- ISBN inválido: assinalado, não recusado --------------------------------
 
-def test_add_invalid_isbn_shows_error(client):
-    """ISBN com dígito de controlo errado: página com erro, nada gravado."""
+def test_add_invalid_isbn_is_saved_and_flagged_in_list(client):
+    """ISBN com dígito de controlo errado: gravado, e a lista mostra o aviso."""
     response = _add(client, isbn="9780132350885")
 
-    assert response.status_code == 200  # volta a mostrar o formulário
-    assert "dígito de controlo válido" in response.get_data(as_text=True)
-    assert list_books() == []
+    assert response.status_code == 302  # redirect para a lista, como num sucesso
+    assert list_books()[0]["isbn"] == "9780132350885"
+    assert "ISBN inválido" in client.get("/").get_data(as_text=True)
 
 
-def test_edit_invalid_isbn_shows_error_and_keeps_old(client):
-    """Editar para um ISBN inválido: recusado, ISBN original mantém-se."""
+def test_edit_invalid_isbn_is_saved(client):
+    """Editar para um ISBN inválido: gravado na mesma."""
     _add(client, isbn="9780132350884")
     livro_id = list_books()[0]["id"]
 
     response = client.post(f"/livros/{livro_id}/editar", data=_form(isbn="123456789"))
 
-    assert response.status_code == 200
-    assert "dígito de controlo válido" in response.get_data(as_text=True)
-    assert list_books()[0]["isbn"] == "9780132350884"
+    assert response.status_code == 302
+    assert list_books()[0]["isbn"] == "123456789"
+
+
+def test_valid_isbn_is_not_flagged_in_list(client):
+    """Um ISBN válido não leva aviso na lista."""
+    _add(client, isbn="978-0-13-235088-4")
+
+    pagina = client.get("/").get_data(as_text=True)
+    assert "9780132350884" in pagina  # gravado na forma canónica
+    assert "ISBN inválido" not in pagina
