@@ -55,7 +55,7 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
 
 ## Próximo passo
 
-1. **PR #2** (ISBN normalizado e assinalado ao gravar): no PC novo, `git fetch` + `git switch feat/validate-isbn-on-save`, `& $py -m pytest`, e testar a GUI no ecrã (aviso pós-gravação e duplicado com hífenes já verificados no ecrã; falta ver o ISBN a vermelho na tabela). Integrar só depois da confirmação do Miguel. Apagar no GitHub as branches já integradas (`fix/update-book-clear-fields`, e esta depois do merge).
+1. **PR #2** (ISBN normalizado e assinalado ao gravar): no PC novo, `git fetch` + `git switch feat/validate-isbn-on-save`, `& $py -m pytest`, e testar a GUI no ecrã (tudo verificado no ecrã). Integrar só depois da confirmação do Miguel. Apagar no GitHub as branches já integradas (`fix/update-book-clear-fields`, e esta depois do merge).
 2. **PC original** (o PR #1 já está na `main`): `git config --global user.email ...` (ver Git), `git switch main`, `git pull`; correr as duas consultas só de leitura em `docs/historico.md` (`""` antigos, secção dos campos vazios; ISBN inválidos ou com hífenes, secção da validação do ISBN). Os ISBN inválidos já aparecem marcados na lista web; os com hífenes ficam normalizados na próxima edição.
 3. A escolher: testar o parsing de `_fetch_google_books`/`_fetch_open_library` com respostas simuladas (trocar `_pedir_json`); (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito).
 
@@ -67,8 +67,8 @@ Pendente: na web, o formulário de adicionar volta vazio quando há erro (o util
 - **Branch:** `feat/validate-isbn-on-save` → PR #2 (CI verde).
 - **Mudou:** ISBN normalizado (`normalize_isbn`) em `add_book`/`update_book`; o mesmo ISBN com e sem hífenes passa a ser detetado como duplicado. Primeira versão recusava ISBN inválidos (`InvalidISBNError`); **revista na sessão seguinte** para assinalar sem recusar (aviso na GUI, ISBN a vermelho na tabela e na lista web), por contradizer a decisão do Miguel.
 - **Testes:** 71 passed (+12 face à `main`); basedpyright 0 erros, 305 avisos (+22, do tipo já existente).
-- **Verificado:** pytest e basedpyright na cloud (Python 3.13) e CI; GUI no ecrã pelo Miguel: `123456789` e `978-0-13-235088-5` gravam com aviso, `978-0-13-235088-4` dá "ISBN duplicado" face a `9780132350884`.
-- **Por verificar:** ISBN a vermelho na tabela da GUI (só `offscreen`) e na lista web (só test client); ISBN antigos na `biblioteca.db` real; Docker não tocado.
+- **Verificado:** pytest e basedpyright na cloud (Python 3.13) e CI; GUI no ecrã pelo Miguel: `123456789` e `978-0-13-235088-5` gravam com aviso, `978-0-13-235088-4` dá "ISBN duplicado" face a `9780132350884`; ISBN inválidos a vermelho na tabela.
+- **Por verificar:** ISBN a vermelho na lista web num browser real (só test client); ISBN antigos na `biblioteca.db` real; Docker não tocado.
 - **Decisões:** camada de dados só normaliza; quem assinala é a interface (aviso pós-gravação na GUI em vez de "gravar mesmo assim?"; marca persistente na web em vez de `flash`, que exigiria chave secreta); forma canónica sem hífenes; `isbn=None` não valida o valor antigo. A branch `fix/update-book-clear-fields` ficou por apagar (bloqueado na cloud).
 
 ## Regras de trabalho
