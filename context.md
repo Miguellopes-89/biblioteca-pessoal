@@ -51,30 +51,27 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
 - Docker: `python:3.14-slim`, `gunicorn==26.2.0` instalado só na imagem (não está em `requirements-web.txt`), utilizador sem privilégios, `BIBLIOTECA_DB=/data/biblioteca.db`; o `create_tables()` corre no `CMD` antes do `gunicorn`. Comandos: `docker build -t biblioteca-web .` e `docker run --rm -p 8000:8000 -v biblioteca-data:/data biblioteca-web` (http://localhost:8000). A BD do container é separada da da desktop; contém 1 "Livro de teste"
 - `tests/`: `conftest.py` (fixture `isolated_db`), `test_isbn.py`, `test_normalize.py`, `test_database.py`, `test_web.py` (fixtures `client` e `block_isbn_network`, esta autouse: faz rebentar qualquer chamada real ao lookup de ISBN), `test_isbn_fetch.py` (troca `_pedir_json` por respostas simuladas da Google Books e da Open Library; fixture autouse `no_network` faz rebentar qualquer pedido real)
 - `web/`: `app.py` + `templates/` (`index.html`, `adicionar.html`, `editar.html`)
-- Rotas web (todas testadas no browser): `GET /` (lista; `?q=` pesquisa), `GET/POST /adicionar`, `GET/POST /livros/<int:livro_id>/editar`, `POST /livros/<int:livro_id>/remover` (só POST), `GET /pesquisar-isbn?isbn=` (JSON; caminho de sucesso nunca validado no browser por causa do 429 da Google Books; o parsing de `_fetch_google_books`/`_fetch_open_library` está testado com respostas simuladas, construídas pela estrutura documentada e **ainda não comparadas com uma resposta real**)
+- Rotas web (todas testadas no browser): `GET /` (lista; `?q=` pesquisa), `GET/POST /adicionar`, `GET/POST /livros/<int:livro_id>/editar`, `POST /livros/<int:livro_id>/remover` (só POST), `GET /pesquisar-isbn?isbn=` (JSON; caminho de sucesso nunca validado no browser por causa do 429 da Google Books; o parsing de `_fetch_google_books`/`_fetch_open_library` está testado com respostas simuladas, a da Open Library **confirmada contra a resposta real** em 2026-10-21; a da Google **ainda por confirmar**, porque a quota sem chave está a zero)
 - Flask com `debug=True` só ao correr `python web/app.py` (localhost); no container o `gunicorn` não executa esse bloco
 
 ## Próximo passo
 
 1. **PR #3** (`test/isbn-fetch-parsing`: testes de parsing + correção do `KeyError`): integrar depois da confirmação do Miguel. Só testes e uma alteração em `isbn_lookup.py`: não mexe na GUI nem na BD.
-2. **Confirmar as respostas simuladas com as reais** (num PC, PowerShell, sem venv):
-   - `(Invoke-RestMethod "https://www.googleapis.com/books/v1/volumes?q=isbn:9780132350884").items[0].volumeInfo | Select-Object title, authors, publisher, categories, imageLinks`
-   - `(Invoke-RestMethod "https://openlibrary.org/api/books?bibkeys=ISBN:9780132350884&format=json&jscmd=data").'ISBN:9780132350884' | Select-Object title, authors, publishers, cover, subjects`
-   Colar o output no Claude Code: se os nomes das chaves baterem com `tests/test_isbn_fetch.py`, a lacuna fecha; se a Google der 429, repetir mais tarde. O `subjects` serve para confirmar se a Open Library devolve o género (o código assume que não).
+2. **Google Books — decidir (a lacuna de teste da Google só fecha com isto):** a quota sem chave está a **zero** (não esgotada), por isso o 429 não passa com o tempo e a cascata cai sempre na Open Library, depois de 3 tentativas inúteis à Google. Opções: (a) chave de API gratuita da Google, lida de `.env`; (b) pôr a Open Library primeiro e a Google como recurso; (c) mínimo: não repetir pedidos que deram erro HTTP 4xx (corrige o atraso, não a Google). Detalhe em `docs/historico.md`.
 3. **PC original:** `git config --global user.email ...` (ver Git), `git switch main`, `git pull`; correr as duas consultas só de leitura em `docs/historico.md` (`""` antigos; ISBN inválidos ou com hífenes). Os ISBN inválidos já aparecem a vermelho na GUI e na web.
 4. **Apagar no GitHub** as branches integradas: `fix/update-book-clear-fields`, `feat/validate-isbn-on-save` (e `test/isbn-fetch-parsing` depois do merge).
-5. A escolher: (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito).
+5. A escolher: (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito); usar os `subjects` da Open Library para sugerir o género (são temas detalhados, não um género: exige escolher um ou mapear).
 
-Pendente: na web, o formulário de adicionar volta vazio quando há erro (o utilizador perde o que escreveu). CSRF no formulário de remover (só necessária antes de expor a app a uma rede). Hipótese por confirmar: `_pedir_bytes` só apanha `URLError` e `TimeoutError`; um reset de ligação a meio da leitura (`ConnectionResetError`) pode não ser apanhado. Backlog secundário: confirmar visualmente uma capa (bloqueado pela falha das APIs); chave de API gratuita da Google Books se o lookup for retomado; decidir se o `CLAUDE.md` passa a ser versionado na raiz.
+Pendente: na web, o formulário de adicionar volta vazio quando há erro (o utilizador perde o que escreveu). CSRF no formulário de remover (só necessária antes de expor a app a uma rede). Hipótese por confirmar: `_pedir_bytes` só apanha `URLError` e `TimeoutError`; um reset de ligação a meio da leitura (`ConnectionResetError`) pode não ser apanhado. Backlog secundário: confirmar visualmente uma capa (a Open Library já devolve uma URL real: `https://covers.openlibrary.org/b/id/15126503-M.jpg`); o título da Google e da Open Library ignora o `subtitle`; decidir se o `CLAUDE.md` passa a ser versionado na raiz.
 
-## Última sessão (2026-10-21, tarde)
+## Última sessão (2026-10-21, noite)
 
-- **Início:** divergência: o `context.md` carregado vinha da `main` e o PR #2 estava aberto com uma versão mais recente. O PR #2 **recusava** ISBN inválidos, contra a decisão do Miguel ("assinalar, não recusar").
-- **PR #2 revisto e integrado** (merge `952b1fd`): a camada de dados só normaliza o ISBN; a GUI avisa depois de gravar; ISBN inválidos a vermelho na tabela da GUI e na lista web (com "⚠ ISBN inválido"). Verificado no ecrã pelo Miguel.
-- **Branch:** `test/isbn-fetch-parsing` → PR #3. 18 testes do caminho de sucesso e das falhas de `_fetch_google_books`, `_fetch_open_library`, da cascata `lookup_isbn` e de `_pedir_json`, com respostas simuladas. Encontraram um bug: se a Google indicar `totalItems > 0` sem `items`, o lookup rebentava com `KeyError` (erro 500 na web) em vez de passar à Open Library. Corrigido.
-- **Testes:** 89 passed (+18); basedpyright 0 erros, 341 avisos (+36 face ao PR #2: 35 em `tests/test_isbn_fetch.py`, 1 em `isbn_lookup.py`, todos do tipo já existente).
-- **Por verificar:** respostas simuladas contra as reais (rede da cloud bloqueia as duas APIs; comando no Próximo passo 2); ISBN a vermelho na web num browser real; Docker não tocado.
-- **Decisões:** aviso pós-gravação na GUI e marca persistente na web (sem `flash`/chave secreta); vermelho só para dígito de controlo inválido (hífenes ficam a preto); testes sem `# pyright: ignore` (convenção do projeto), aceitando os avisos.
+- **Branch:** `test/isbn-fetch-parsing` (PR #3, ainda aberto: commit novo acrescentado ao mesmo PR, por fechar a mesma tarefa).
+- **Respostas reais** obtidas pelo browser integrado da app Claude no PC (a cloud continua bloqueada): **Open Library confirmada** — chaves batem com o código; resposta simulada substituída por cópia encurtada da real. **Google: 429 com quota anónima a zero** (ver Próximo passo 2).
+- **Corrigido:** comentário em `isbn_lookup.py` que dizia que a Open Library não devolve `subjects` (devolve).
+- **Testes:** 89 passed; basedpyright 0 erros, 341 avisos (sem alteração).
+- **Por verificar:** forma real da resposta da Google (sem quota); CI do novo commit no PR #3; GUI e Docker não tocados.
+- **Decisões:** não usar os `subjects` como género nesta sessão (decisão de produto, fica no Próximo passo 5); não mexer no retry nem na ordem da cascata sem escolha do Miguel.
 
 ## Regras de trabalho
 
@@ -86,4 +83,4 @@ Pendente: na web, o formulário de adicionar volta vazio quando há erro (o util
 
 ## Título desta sessão
 
-`isbn-assinalado-e-testes-parsing-apis`
+`respostas-reais-open-library-quota-google`
