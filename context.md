@@ -29,8 +29,9 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
   - **Caminho:** `C:\Users\Utilizador\Desktop\biblioteca-pessoal` (clone). **Venv** em `C:\Users\Utilizador\venvs\biblioteca-pessoal`, usada sem ativar: `$py = "C:\Users\Utilizador\venvs\biblioteca-pessoal\Scripts\python.exe"` e depois `& $py -m pytest`, `& $py gui.py` (o `$py` perde-se ao fechar a janela). BD de testes própria (não são os dados reais)
   - Usar a janela "Windows PowerShell" normal: nem "Administrator" nem "(x86)" (32 bits, incompatível com PySide6)
 - **Dependências:** `PySide6` 6.11.2 (`requirements.txt`) e `Flask` 3.1.3 (`requirements-web.txt`) separados deliberadamente; `requirements-dev.txt` com `pytest` 9.1.1 e `basedpyright`
-- **basedpyright:** 0 erros, 283 avisos (deixados por resolver de propósito). `pyrightconfig.json` só com `"failOnWarnings": false`: só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI e o PC novo usam `--pythonpath <python da venv>`
-- **Testes e CI:** `pytest` a partir da raiz; **59 testes, todos passam, 0 `xfail`** (`tests/test_web.py` tem 17; `tests/test_database.py` tem 22). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde no PR #1
+- **basedpyright:** 0 erros, 300 avisos (deixados por resolver de propósito). `pyrightconfig.json` só com `"failOnWarnings": false`: só erros reprovam. Com a venv ativada, `basedpyright` sem flags usa o Python ativo; o CI e o PC novo usam `--pythonpath <python da venv>`
+- **Testes e CI:** `pytest` a partir da raiz; **70 testes, todos passam, 0 `xfail`** (`tests/test_database.py` tem 27; `tests/test_web.py` 19; `tests/test_isbn.py` 17; `tests/test_normalize.py` 7). CI em `.github/workflows/ci.yml` (GitHub Actions) corre `pytest` + `basedpyright` em cada push para a `main` e em cada PR; verde no PR #1
+- **Sessões cloud do Claude Code:** fazem push de branches novas, mas **não conseguem apagar branches remotas** (403 do proxy); isso faz-se no GitHub (Branches → caixote do lixo) ou com `git push origin --delete <branch>` num PC
 - **Colar código no Zed:** causa mais comum de bugs (4 vezes) — confirmar visualmente a indentação de blocos `if`/`try` depois de colar
 
 ## Git
@@ -43,8 +44,9 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
 ## Ficheiros
 
 - Raiz: `gui.py` (PySide6), `database.py`, `isbn_lookup.py`, `main.py` (smoke test antigo, não usado), `README.md` (inglês), `LICENSE`, `pytest.ini`, `pyrightconfig.json`, `Dockerfile`, `.dockerignore`, `biblioteca.db` (não versionado; no PC original, 9 livros)
-- `database.py` expõe: `normalize_text`, `connect`, `create_tables`, `get_or_create_author`, `add_book`, `list_books`, `search_books`, `update_book`, `delete_book`, `get_book`. `DB_NAME` lê a variável de ambiente `BIBLIOTECA_DB` e, se não existir, usa o caminho absoluto de `biblioteca.db` junto ao ficheiro; listagens ordenadas sem acentos nem maiúsculas
+- `database.py` expõe: `InvalidISBNError`, `normalize_text`, `connect`, `create_tables`, `get_or_create_author`, `add_book`, `list_books`, `search_books`, `update_book`, `delete_book`, `get_book`. `DB_NAME` lê a variável de ambiente `BIBLIOTECA_DB` e, se não existir, usa o caminho absoluto de `biblioteca.db` junto ao ficheiro; listagens ordenadas sem acentos nem maiúsculas
 - **Campos opcionais vazios** (editora, coleção, género, ISBN): `""` é gravado como `NULL` (função interna `_empty_to_none`). No `update_book`: `None` = manter o valor atual; `""` = limpar; outro texto = gravar. A GUI e a rota web de editar enviam `""` para um campo esvaziado
+- **ISBN ao gravar** (desde 2026-10-21): `add_book`/`update_book` gravam-no na forma canónica (`isbn_lookup.normalize_isbn`: sem hífenes nem espaços, `X` maiúsculo) e lançam `InvalidISBNError` se o dígito de controlo for inválido, sem gravar nada; GUI e web mostram "ISBN inválido". `update_book` com `isbn=None` não valida o valor antigo
 - Docker: `python:3.14-slim`, `gunicorn==26.2.0` instalado só na imagem (não está em `requirements-web.txt`), utilizador sem privilégios, `BIBLIOTECA_DB=/data/biblioteca.db`; o `create_tables()` corre no `CMD` antes do `gunicorn`. Comandos: `docker build -t biblioteca-web .` e `docker run --rm -p 8000:8000 -v biblioteca-data:/data biblioteca-web` (http://localhost:8000). A BD do container é separada da da desktop; contém 1 "Livro de teste"
 - `tests/`: `conftest.py` (fixture `isolated_db`), `test_isbn.py`, `test_normalize.py`, `test_database.py`, `test_web.py` (fixtures `client` e `block_isbn_network`, esta autouse: faz rebentar qualquer chamada real ao lookup de ISBN)
 - `web/`: `app.py` + `templates/` (`index.html`, `adicionar.html`, `editar.html`)
@@ -53,19 +55,21 @@ O Claude do Projeto (claude.ai) só vê este ficheiro; o Claude Code recebe o `C
 
 ## Próximo passo
 
-1. **Integrar o PR #1** (correção de campos vazios + este ficheiro) depois da confirmação do Miguel. Depois, no PC original: `git config --global user.email ...` (ver Git), `git switch main`, `git pull`, e correr a consulta de verificação de `""` antigos (só leitura; em `docs/historico.md`, secção de 2026-10-21).
-2. A escolher: **validar o ISBN ao adicionar/guardar** (hoje a GUI aceita `123456789`; a validação do dígito de controlo só corre no botão "Procurar"; mexe em `gui.py` e `web/app.py`, ou em `database.py` para cobrir as duas); testar o parsing de `_fetch_google_books`/`_fetch_open_library` com respostas simuladas (trocar `_pedir_json`); (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito).
+1. **PR #2** (validação do ISBN ao gravar): no PC novo, `git fetch` + `git switch feat/validate-isbn-on-save`, `& $py -m pytest`, e testar a GUI no ecrã (gravar `123456789` → "ISBN inválido"; gravar `978-0-13-235088-4` → aparece `9780132350884`). Integrar só depois da confirmação do Miguel. Apagar no GitHub as branches já integradas (`fix/update-book-clear-fields`, e esta depois do merge).
+2. **PC original** (o PR #1 já está na `main`): `git config --global user.email ...` (ver Git), `git switch main`, `git pull`; correr as duas consultas só de leitura em `docs/historico.md` (`""` antigos, secção dos campos vazios; ISBN inválidos ou com hífenes, secção da validação do ISBN). Livros com ISBN inválido têm de ter o ISBN corrigido ou apagado na próxima edição.
+3. A escolher: testar o parsing de `_fetch_google_books`/`_fetch_open_library` com respostas simuladas (trocar `_pedir_json`); (B) notebook de EDA com pandas e apresentar a validação de ISBN/deteção de duplicados como data quality no README (alinhado com o alvo de carreira do Miguel); limpar avisos do basedpyright (ou modo estrito).
 
-Pendente: CSRF no formulário de remover (só necessária antes de expor a app a uma rede). Backlog secundário: confirmar visualmente uma capa (bloqueado pela falha das APIs); chave de API gratuita da Google Books se o lookup for retomado; decidir se o `CLAUDE.md` passa a ser versionado na raiz.
+Pendente: na web, o formulário de adicionar volta vazio quando há erro (o utilizador perde o que escreveu). CSRF no formulário de remover (só necessária antes de expor a app a uma rede). Backlog secundário: confirmar visualmente uma capa (bloqueado pela falha das APIs); chave de API gratuita da Google Books se o lookup for retomado; decidir se o `CLAUDE.md` passa a ser versionado na raiz.
 
 ## Última sessão (2026-10-21)
 
-- **Branch:** `fix/update-book-clear-fields` → PR #1 (CI verde).
-- **Mudou:** `database.py` grava `""` como `NULL` em `add_book`/`update_book`; no `update_book`, `""` limpa e `None` mantém. A rota web de editar envia `""`. Corrige: (a) web não limpava campos ao editar (era o `xfail`); (b) GUI recusava um segundo livro sem ISBN como "duplicado" (`UNIQUE` aceita vários `NULL`, só um `""`). O registo anterior de que o bug (a) afetava também a desktop estava errado.
-- **Testes:** 59 passed, 0 xfail (+3 testes novos); basedpyright 0 erros, 283 avisos.
-- **Verificado:** pytest e GUI no PC novo (limpar editora/ISBN e dois livros sem ISBN, OK); CI.
-- **Por verificar:** consulta de `""` antigos na `biblioteca.db` real (PC original); `gui.py` e Docker não foram tocados nem testados.
-- **Decisões:** opção 1 (normalizar na camada de dados) em vez de valor sentinela ou fim das atualizações parciais; sem migração dos dados antigos (limpam-se ao editar); novo fluxo de três cópias; email noreply nos commits.
+- **Início:** o PR #1 já tinha sido integrado na `main` (merge `36c0f2a`), ao contrário do que este ficheiro dizia.
+- **Branch:** `feat/validate-isbn-on-save` → PR #2 (CI por confirmar).
+- **Mudou:** ISBN normalizado (`normalize_isbn`) e validado em `add_book`/`update_book`, que lançam `InvalidISBNError`; GUI e web mostram "ISBN inválido". O mesmo ISBN com e sem hífenes passa a ser detetado como duplicado.
+- **Testes:** 70 passed (+11); basedpyright 0 erros, 300 avisos (+17, do tipo já existente).
+- **Verificado:** pytest e basedpyright na cloud (Python 3.13, não 3.14); GUI só em modo `offscreen`.
+- **Por verificar:** GUI no ecrã; CI do PR #2; ISBN antigos na `biblioteca.db` real; Docker não tocado.
+- **Decisões:** validação na camada de dados com exceção própria; forma canónica sem hífenes; `isbn=None` não valida o valor antigo. A branch `fix/update-book-clear-fields` ficou por apagar (bloqueado na cloud).
 
 ## Regras de trabalho
 
@@ -77,4 +81,4 @@ Pendente: CSRF no formulário de remover (só necessária antes de expor a app a
 
 ## Título desta sessão
 
-`correcao-campos-vazios-e-segundo-pc`
+`validacao-isbn-ao-gravar`
